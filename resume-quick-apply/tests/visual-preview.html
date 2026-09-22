@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <base href="../" />
+    <title>投简历助手 UI 预览</title>
+    <link rel="stylesheet" href="popup.css" />
+    <style>html,body{min-width:0;background:#e8edf0}body{display:grid;place-items:start center;padding:24px}.app-shell{box-shadow:0 14px 40px #1c2a3322}@media(max-width:380px){body{padding:0}}</style>
+  </head>
+  <body>
+    <script>
+      (async () => {
+        const html = await fetch('popup.html').then(response => response.text());
+        const parsed = new DOMParser().parseFromString(html, 'text/html');
+        for (const script of parsed.querySelectorAll('script')) script.remove();
+        document.body.insertAdjacentHTML('afterbegin', parsed.body.innerHTML);
+        const store = {
+          profile: { name: '林晓', phone: '13800138000', email: 'lin@example.com', city: '上海', education: '硕士', school: '同济大学', skills: 'Python、SQL、数据分析', website: '', summary: '' },
+          resume: { name: '林晓-产品数据分析.pdf', type: 'application/pdf', dataUrl: 'data:application/pdf;base64,JVBERi0xLjQK' },
+          settings: { quickAttachment: false },
+          experiences: {
+            work: [
+              { company: '星河科技', role: '高级产品经理', location: '上海', startDate: '2022.06', endDate: '至今', description: '负责数据平台与指标体系建设。' },
+              { company: '云帆网络', role: '产品经理', location: '杭州', startDate: '2019.07', endDate: '2022.05', description: '负责商业化产品。' }
+            ],
+            education: [{ school: '同济大学', degree: '硕士', major: '计算机科学', startDate: '2016.09', endDate: '2019.06', description: '' }],
+            projects: [{ name: '经营分析平台', role: '项目负责人', startDate: '2023.01', endDate: '2023.08', description: '覆盖二十个业务团队。' }]
+          },
+          applications: [
+            { title: '数据产品经理 - 星河科技', url: 'https://jobs.example.test/1', createdAt: Date.now() },
+            { title: '商业分析师 - 云帆网络', url: 'https://jobs.example.test/2', createdAt: Date.now() - 86400000 }
+          ]
+        };
+        window.chrome = {
+          storage: { local: { async get(keys) { return Object.fromEntries(keys.map(key => [key, store[key]])); }, async set(patch) { Object.assign(store, patch); } } },
+          tabs: {
+            async query() { return [{ id: 1, title: '高级数据产品经理｜星河科技', url: 'https://jobs.example.test/apply/4827' }]; },
+            async sendMessage(id, request) {
+              if (request.type === 'previewResume') return {
+                items: [
+                  { title: '姓名', label: '候选人姓名', value: '林晓', status: 'ready' },
+                  { title: '手机号', label: '联系电话', value: '13800138000', status: 'kept' },
+                  { title: '邮箱', label: '电子邮箱', value: 'lin@example.com', status: 'ready' },
+                  { title: '个人主页', label: '作品集链接', value: '', status: 'missing' }
+                ], total: 4, ready: 2, attachment: { message: '将选择附件：林晓-产品数据分析.pdf。网站可能立即上传。' }, message: '预览不会修改网页或选择附件。'
+              };
+              return { message: request.type === 'undoResume' ? '当前页面没有可撤销的填写。' : '已填 2 项，保留 1 项已有内容。请核对后手动提交。' };
+            }
+          }
+        };
+        for (const src of ['data.js', 'resume-parser.js', 'popup.js']) {
+          await new Promise((resolve, reject) => {
+            const script = document.createElement('script'); script.src = src; script.onload = resolve; script.onerror = reject; document.body.append(script);
+          });
+        }
+        const requestedTab = new URLSearchParams(location.search).get('tab');
+        if (requestedTab) {
+          const tab = document.querySelector(`[data-tab="${requestedTab}"]`);
+          while (tab?.disabled) await new Promise(resolve => setTimeout(resolve, 10));
+          tab?.click();
+          if (new URLSearchParams(location.search).get('scroll') === 'bottom') {
+            const shell = document.querySelector('.app-shell');
+            shell.scrollTop = shell.scrollHeight;
+          }
+        }
+      })();
+    </script>
+  </body>
+</html>

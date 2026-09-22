@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>高级数据产品经理 - 星河招聘</title>
+    <style>
+      *{box-sizing:border-box}body{margin:0;background:#f4f6f8;color:#18222d;font:14px/1.5 "Segoe UI","Microsoft YaHei",sans-serif}
+      header{height:58px;padding:0 8vw;display:flex;align-items:center;justify-content:space-between;background:#fff;border-bottom:1px solid #dfe5e9;font-weight:700}
+      main{width:min(860px,84vw);margin:34px auto;background:#fff;border:1px solid #dfe5e9;border-radius:6px;padding:28px}
+      h1{margin:0 0 4px;font-size:24px}.meta{color:#66727f}.divider{height:1px;background:#e6eaed;margin:24px 0}
+      form{display:grid;grid-template-columns:1fr 1fr;gap:18px}label{display:grid;gap:6px;font-weight:600}input,textarea{border:1px solid #ccd5dc;border-radius:5px;padding:10px;font:inherit}textarea,.wide{grid-column:1/-1}
+      button.submit{justify-self:start;border:0;border-radius:5px;padding:10px 22px;background:#2864dc;color:#fff;font-weight:700}
+    </style>
+  </head>
+  <body>
+    <header><span>星河招聘</span><span>候选人中心</span></header>
+    <main>
+      <h1>高级数据产品经理</h1><p class="meta">上海 · 产品与数据 · 全职</p><div class="divider"></div>
+      <form>
+        <label>姓名<input name="name" autocomplete="name" /></label>
+        <label>手机号<input name="phone" autocomplete="tel" value="13800138000" /></label>
+        <label>电子邮箱<input name="email" autocomplete="email" /></label>
+        <label>所在城市<input name="city" autocomplete="address-level2" /></label>
+        <label class="wide">自我介绍<textarea name="summary" rows="3"></textarea></label>
+        <label class="wide">上传简历<input type="file" name="resume" accept=".pdf" /></label>
+        <button class="submit" type="button">提交申请</button>
+      </form>
+    </main>
+    <script>
+      window.chrome = {
+        storage: { local: { async get() { return { profile: { name: '林晓', phone: '13800138000', email: 'lin@example.com', city: '上海', summary: '擅长数据产品与业务分析。' }, resume: null, applications: [] }; }, async set() {} } },
+        runtime: { getURL(path) { return '../' + path; }, onMessage: { addListener() {} } }
+      };
+    </script>
+    <script src="../data.js"></script><script src="../content.js"></script>
+  </body>
+</html>

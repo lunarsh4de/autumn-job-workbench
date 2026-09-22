@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>秋招工作台</title>
+    <link rel="stylesheet" href="dashboard.css" />
+  </head>
+  <body>
+    <div class="app-frame">
+      <aside class="sidebar" id="sidebar">
+        <div class="workspace-brand">
+          <span class="workspace-mark"><img src="icons/briefcase-business.svg" alt="" /></span>
+          <div><strong>秋招工作台</strong><span>2027 届</span></div>
+        </div>
+        <nav class="side-nav" aria-label="工作台导航">
+          <button class="nav-item active" type="button" data-view="overview"><img src="icons/layout-dashboard.svg" alt="" /><span>总览</span></button>
+          <button class="nav-item" type="button" data-view="board"><img src="icons/kanban.svg" alt="" /><span>申请看板</span><b id="nav-active-count">0</b></button>
+          <button class="nav-item" type="button" data-view="jobs"><img src="icons/list-filter.svg" alt="" /><span>全部岗位</span></button>
+          <button class="nav-item" type="button" data-view="companies"><img src="icons/building-2.svg" alt="" /><span>公司</span></button>
+          <button class="nav-item" type="button" data-view="calendar"><img src="icons/calendar.svg" alt="" /><span>日程</span></button>
+        </nav>
+        <div class="sidebar-footer">
+          <button class="nav-item" id="open-popup" type="button"><img src="icons/settings.svg" alt="" /><span>投递资料</span></button>
+          <div class="local-note"><span class="status-dot"></span><div><strong>仅保存在本机</strong><small>插件记录会自动同步</small></div></div>
+        </div>
+      </aside>
+
+      <main class="main-shell">
+        <header class="topbar">
+          <div class="topbar-left">
+            <button class="icon-button mobile-menu" id="mobile-menu" type="button" title="打开导航" aria-label="打开导航"><img src="icons/menu.svg" alt="" /></button>
+            <div><p class="eyebrow">PERSONAL JOB SEARCH OS</p><h1 id="view-title">秋招总览</h1></div>
+          </div>
+          <div class="top-actions">
+            <label class="global-search"><img src="icons/search.svg" alt="" /><input id="global-search" type="search" placeholder="搜索公司或岗位" autocomplete="off" /></label>
+            <button class="button secondary" id="export-jobs" type="button"><img src="icons/download.svg" alt="" /><span>导出</span></button>
+            <button class="button primary" id="new-job" type="button"><img src="icons/plus.svg" alt="" /><span>新增岗位</span></button>
+          </div>
+        </header>
+
+        <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+        <section class="view active" id="view-overview" data-title="秋招总览">
+          <div class="welcome-row">
+            <div><h2>把每一次投递变成可推进的下一步</h2><p id="overview-caption">正在读取你的投递记录...</p></div>
+            <button class="text-link" type="button" data-go-view="board">打开申请看板 <img src="icons/arrow-up-right.svg" alt="" /></button>
+          </div>
+
+          <div class="metric-grid" aria-label="核心数据">
+            <article class="metric-card"><div class="metric-label"><span>全部岗位</span><span class="metric-icon teal"><img src="icons/briefcase-business.svg" alt="" /></span></div><strong id="metric-total">0</strong><small id="metric-week">本周新增 0</small></article>
+            <article class="metric-card"><div class="metric-label"><span>推进中</span><span class="metric-icon blue"><img src="icons/clock-3.svg" alt="" /></span></div><strong id="metric-active">0</strong><small>关注到面试阶段</small></article>
+            <article class="metric-card"><div class="metric-label"><span>面试中</span><span class="metric-icon orange"><img src="icons/calendar.svg" alt="" /></span></div><strong id="metric-interview">0</strong><small id="metric-upcoming">暂无近期面试</small></article>
+            <article class="metric-card"><div class="metric-label"><span>Offer</span><span class="metric-icon green"><img src="icons/check-circle-2.svg" alt="" /></span></div><strong id="metric-offer">0</strong><small id="metric-rate">整体回应率 0%</small></article>
+          </div>
+
+          <div class="overview-grid">
+            <article class="panel trend-panel">
+              <div class="panel-head"><div><p class="eyebrow">7-DAY ACTIVITY</p><h3>近 7 天投递节奏</h3></div><span class="panel-meta" id="trend-total">0 次</span></div>
+              <div class="trend-chart" id="trend-chart" aria-label="近 7 天新增岗位柱状图"></div>
+            </article>
+            <article class="panel funnel-panel">
+              <div class="panel-head"><div><p class="eyebrow">PIPELINE</p><h3>申请漏斗</h3></div><button class="icon-button" type="button" data-go-view="board" title="查看申请看板" aria-label="查看申请看板"><img src="icons/arrow-up-right.svg" alt="" /></button></div>
+              <div class="funnel-list" id="funnel-list"></div>
+            </article>
+          </div>
+
+          <div class="overview-grid lower">
+            <article class="panel">
+              <div class="panel-head"><div><p class="eyebrow">RECENT</p><h3>最近更新</h3></div><button class="text-link" type="button" data-go-view="jobs">查看全部</button></div>
+              <div class="recent-list" id="recent-list"></div>
+            </article>
+            <article class="panel">
+              <div class="panel-head"><div><p class="eyebrow">NEXT UP</p><h3>下一步安排</h3></div><button class="text-link" type="button" data-go-view="calendar">日程视图</button></div>
+              <div class="schedule-list" id="schedule-list"></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view" id="view-board" data-title="申请看板" hidden>
+          <div class="view-toolbar">
+            <div><h2>申请看板</h2><p>拖动岗位卡片即可更新阶段</p></div>
+            <div class="filter-group"><select id="board-priority" aria-label="按优先级筛选"><option value="all">全部优先级</option><option value="high">重点关注</option><option value="medium">一般</option><option value="normal">普通</option></select></div>
+          </div>
+          <div class="kanban" id="kanban"></div>
+        </section>
+
+        <section class="view" id="view-jobs" data-title="全部岗位" hidden>
+          <div class="view-toolbar">
+            <div><h2>全部岗位</h2><p id="jobs-count">共 0 个岗位</p></div>
+            <div class="filter-group"><select id="jobs-stage" aria-label="按阶段筛选"><option value="all">全部阶段</option></select><select id="jobs-sort" aria-label="排序"><option value="updated">最近更新</option><option value="created">最近添加</option><option value="company">公司名称</option></select></div>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>岗位 / 公司</th><th>阶段</th><th>地点</th><th>下一步</th><th>更新时间</th><th><span class="sr-only">操作</span></th></tr></thead><tbody id="jobs-table"></tbody></table></div>
+        </section>
+
+        <section class="view" id="view-companies" data-title="公司视图" hidden>
+          <div class="view-toolbar"><div><h2>公司视图</h2><p id="companies-count">共 0 家公司</p></div></div>
+          <div class="company-grid" id="company-grid"></div>
+        </section>
+
+        <section class="view" id="view-calendar" data-title="日程与跟进" hidden>
+          <div class="view-toolbar"><div><h2>日程与跟进</h2><p>按时间管理面试、笔试和主动跟进</p></div></div>
+          <div class="calendar-layout"><aside class="date-card"><span id="today-month"></span><strong id="today-day"></strong><small id="today-weekday"></small></aside><div class="timeline" id="timeline"></div></div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="job-dialog">
+      <form id="job-form" method="dialog">
+        <div class="dialog-head"><div><p class="eyebrow">JOB RECORD</p><h2 id="dialog-title">新增岗位</h2></div><button class="icon-button" id="close-dialog" type="button" title="关闭" aria-label="关闭"><img src="icons/x.svg" alt="" /></button></div>
+        <input id="job-id" name="id" type="hidden" />
+        <div class="form-grid">
+          <label>公司<input name="company" required maxlength="160" placeholder="例如：字节跳动" /></label>
+          <label>岗位<input name="title" required maxlength="240" placeholder="例如：产品经理" /></label>
+          <label>阶段<select name="stage" id="form-stage"></select></label>
+          <label>优先级<select name="priority"><option value="high">重点关注</option><option value="medium">一般</option><option value="normal" selected>普通</option></select></label>
+          <label>地点<input name="location" maxlength="120" placeholder="城市 / 远程" /></label>
+          <label>薪资信息<input name="salary" maxlength="120" placeholder="选填" /></label>
+          <label>投递链接<input name="url" type="url" maxlength="4000" placeholder="https://" /></label>
+          <label>申请截止<input name="deadline" type="date" /></label>
+          <label>下一步时间<input name="nextActionAt" type="datetime-local" /></label>
+          <label>面试时间<input name="interviewAt" type="datetime-local" /></label>
+          <label class="wide">备注<textarea name="notes" rows="4" maxlength="10000" placeholder="面试准备、联系人、结果记录..."></textarea></label>
+        </div>
+        <div class="dialog-actions"><button class="button danger ghost" id="delete-job" type="button" hidden><img src="icons/trash-2.svg" alt="" />删除</button><span></span><button class="button secondary" id="cancel-dialog" type="button">取消</button><button class="button primary" type="submit"><img src="icons/check-circle-2.svg" alt="" />保存岗位</button></div>
+      </form>
+    </dialog>
+
+    <script src="dashboard-data.js"></script>
+    <script src="dashboard.js"></script>
+  </body>
+</html>

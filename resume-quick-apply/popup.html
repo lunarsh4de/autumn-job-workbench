@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>投简历助手</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div class="brand">
+          <span class="brand-mark"><img src="icons/briefcase-business.svg" alt="" /></span>
+          <div>
+            <h1>投简历助手</h1>
+            <p>Quick Apply</p>
+          </div>
+        </div>
+        <span class="local-badge"><img src="icons/shield-check.svg" alt="" />本地保存</span>
+      </header>
+
+      <section class="page-context" aria-label="当前页面">
+        <span class="context-icon"><img src="icons/briefcase-business.svg" alt="" /></span>
+        <div class="context-copy">
+          <span>当前页面</span>
+          <strong id="page-title">正在识别…</strong>
+          <small id="page-host"></small>
+        </div>
+        <span id="page-capability" class="status-badge" data-status="loading">检测中</span>
+      </section>
+
+      <div id="message" class="toast" role="status" aria-live="polite" hidden></div>
+
+      <nav class="tabs" role="tablist" aria-label="功能导航">
+        <button class="tab-button active" id="tab-quick" type="button" role="tab" aria-selected="true" aria-controls="panel-quick" data-tab="quick">
+          <img src="icons/zap.svg" alt="" />投递
+        </button>
+        <button class="tab-button" id="tab-profile" type="button" role="tab" aria-selected="false" aria-controls="panel-profile" data-tab="profile">
+          <img src="icons/user-round.svg" alt="" />资料
+        </button>
+        <button class="tab-button" id="tab-history" type="button" role="tab" aria-selected="false" aria-controls="panel-history" data-tab="history">
+          <img src="icons/history.svg" alt="" />记录
+        </button>
+        <button class="tab-button" id="tab-experiences" type="button" role="tab" aria-selected="false" aria-controls="panel-experiences" data-tab="experiences">
+          <img src="icons/briefcase-business.svg" alt="" />经历
+        </button>
+      </nav>
+
+      <section class="tab-panel active" id="panel-quick" role="tabpanel" aria-labelledby="tab-quick">
+        <section class="quick-intake" aria-label="从简历开始">
+          <div class="quick-intake-icon"><img src="icons/upload.svg" alt="" /></div>
+          <div class="quick-intake-copy">
+            <p class="overline">START HERE</p>
+            <h2>先上传简历，自动整理资料</h2>
+            <p id="quick-import-status">本地解析 PDF、DOCX 或 TXT，确认后再保存</p>
+          </div>
+          <button id="quick-import-button" class="button primary" type="button">上传并解析</button>
+        </section>
+
+        <section class="readiness" aria-label="投递准备情况">
+          <div class="section-title-row">
+            <div>
+              <p class="overline">READY CHECK</p>
+              <h2>投递准备</h2>
+            </div>
+            <strong id="profile-score">0%</strong>
+          </div>
+          <div class="progress-track" aria-hidden="true"><span id="profile-progress"></span></div>
+          <div class="readiness-grid">
+            <button class="readiness-item" type="button" data-open-tab="profile">
+              <img src="icons/user-round.svg" alt="" />
+              <span><strong id="profile-count">0 / 9</strong><small>资料字段</small></span>
+            </button>
+            <button class="readiness-item" type="button" data-open-tab="profile">
+              <img src="icons/file-text.svg" alt="" />
+              <span><strong id="resume-status">未上传</strong><small>简历附件</small></span>
+            </button>
+          </div>
+        </section>
+
+        <section class="primary-actions" aria-label="填写操作">
+          <button id="fill-button" class="button primary command" type="button">
+            <img src="icons/zap.svg" alt="" /><span><strong>填充当前页面</strong><small>保留网页中已有内容</small></span>
+          </button>
+          <div class="action-grid">
+            <button id="preview-button" class="button secondary" type="button"><img src="icons/scan-search.svg" alt="" />预览字段</button>
+            <button id="undo-button" class="button secondary" type="button"><img src="icons/undo-2.svg" alt="" />撤销填写</button>
+          </div>
+        </section>
+
+        <section id="preview" class="result-panel" hidden aria-label="填写预览">
+          <div class="result-heading">
+            <strong>页面字段</strong>
+            <span id="preview-summary" role="status"></span>
+          </div>
+          <ul id="preview-list"></ul>
+          <p id="preview-attachment" class="attachment-result"></p>
+          <p class="result-note">执行时会重新扫描页面；附件上传无法撤销。</p>
+        </section>
+
+        <section class="safety-strip">
+          <img src="icons/circle-check.svg" alt="" />
+          <span>插件不会点击最终提交，请核对字段和附件状态。</span>
+        </section>
+      </section>
+
+      <section class="tab-panel" id="panel-profile" role="tabpanel" aria-labelledby="tab-profile" hidden>
+        <form id="profile-form">
+          <div class="section-title-row compact">
+            <div><p class="overline">PROFILE</p><h2>个人资料</h2></div>
+            <span id="save-state" aria-live="polite"></span>
+          </div>
+          <section id="setup-hint" class="setup-hint" hidden>
+            <img src="icons/circle-alert.svg" alt="" />
+            <div><strong>先完成基础资料</strong><span>填写联系方式并选择简历，保存后即可回到“投递”一键填写。</span></div>
+          </section>
+          <div class="field-grid">
+            <label>姓名<input name="name" autocomplete="name" placeholder="如：张三" /></label>
+            <label>手机号<input name="phone" autocomplete="tel" placeholder="如：13800138000" /></label>
+            <label>邮箱<input name="email" autocomplete="email" placeholder="name@example.com" /></label>
+            <label>城市<input name="city" autocomplete="address-level2" placeholder="如：上海" /></label>
+            <label>学历<input name="education" placeholder="如：本科" /></label>
+            <label>学校<input name="school" placeholder="如：复旦大学" /></label>
+            <label class="wide">技能关键词<input name="skills" placeholder="Python、SQL、产品分析" /></label>
+            <label class="wide">个人主页<input name="website" autocomplete="url" placeholder="https://..." /></label>
+            <label class="wide">自我介绍<textarea name="summary" rows="3" placeholder="用于填写个人简介类字段"></textarea></label>
+          </div>
+
+          <div class="resume-control">
+            <span class="resume-icon"><img src="icons/file-text.svg" alt="" /></span>
+            <label class="file-picker">
+              <span>简历附件</span>
+              <strong id="resume-name">尚未选择</strong>
+              <small>PDF / DOC / DOCX，最大 3 MB</small>
+              <input id="resume-file" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+            </label>
+            <button id="clear-resume" class="icon-button" type="button" title="移除附件" aria-label="移除附件">×</button>
+          </div>
+
+          <label class="setting-row" for="quick-attachment">
+            <span><strong>快捷填充时选择附件</strong><small>仅影响 Alt+Shift+F 和网页右键菜单；可能触发网站立即上传</small></span>
+            <span class="switch"><input id="quick-attachment" type="checkbox" /><span aria-hidden="true"></span></span>
+          </label>
+
+          <div class="profile-actions">
+            <button class="button primary" id="save-button" type="button"><img src="icons/save.svg" alt="" />保存资料</button>
+            <button class="button quiet" id="export-button" type="button"><img src="icons/download.svg" alt="" />导出</button>
+            <button class="button quiet" id="import-button" type="button"><img src="icons/upload.svg" alt="" />导入</button>
+          </div>
+          <input id="import-file" type="file" accept="application/json,.json" hidden />
+        </form>
+      </section>
+
+      <section class="tab-panel" id="panel-history" role="tabpanel" aria-labelledby="tab-history" hidden>
+        <div class="section-title-row compact">
+          <div><p class="overline">APPLICATIONS</p><h2>最近投递</h2></div>
+          <div class="history-tools">
+            <button id="export-history" class="text-button" type="button"><img src="icons/download.svg" alt="" />导出记录</button>
+            <button id="export-companies" class="text-button" type="button"><img src="icons/download.svg" alt="" />导出公司</button>
+            <button id="clear-history" class="text-button danger-text" type="button">清空</button>
+          </div>
+        </div>
+        <ul id="application-list" class="application-list"><li class="empty-state">还没有投递记录</li></ul>
+        <div class="company-summary-heading"><strong>已投公司</strong><span>按公司汇总</span></div>
+        <ul id="company-list" class="company-list"><li class="empty-state">还没有公司记录</li></ul>
+      </section>
+
+      <section class="tab-panel" id="panel-experiences" role="tabpanel" aria-labelledby="tab-experiences" hidden>
+        <div class="section-title-row compact">
+          <div><p class="overline">EXPERIENCES</p><h2>分类经历</h2></div>
+          <span id="experience-save-state" aria-live="polite"></span>
+        </div>
+
+        <section class="resume-import secondary-import">
+          <div>
+            <strong>重新解析简历</strong>
+            <small>分类结果会先预览，不会直接覆盖现有资料</small>
+          </div>
+          <button id="resume-import-button" class="button secondary" type="button"><img src="icons/upload.svg" alt="" />选择简历</button>
+          <input id="resume-import-file" type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" hidden />
+        </section>
+
+        <section id="resume-import-preview" class="import-preview" hidden>
+          <strong>分类预览</strong>
+          <p id="resume-import-summary"></p>
+          <label class="inline-check"><input id="resume-import-replace" type="checkbox" />替换已有经历和已填写的基础资料</label>
+          <label id="resume-import-attachment-row" class="inline-check"><input id="resume-import-save-attachment" type="checkbox" checked />同时保存为投递附件</label>
+          <div class="import-actions">
+            <button id="resume-import-apply" class="button primary" type="button">应用分类结果</button>
+            <button id="resume-import-cancel" class="button quiet" type="button">取消</button>
+          </div>
+        </section>
+
+        <div id="experience-sections"></div>
+      </section>
+
+    </main>
+    <script src="vendor/mammoth.browser.min.js"></script>
+    <script src="data.js"></script>
+    <script src="resume-parser.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

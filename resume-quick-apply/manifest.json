@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "投简历助手",
+  "version": "0.12.2",
+  "description": "从简历分类多类经历，在招聘网站快速填充，记录已投岗位与公司，并支持本地 CSV 导出。",
+  "permissions": ["storage", "activeTab", "scripting", "contextMenus"],
+  "action": {
+    "default_title": "投简历助手",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "commands": {
+    "quick-fill": {
+      "suggested_key": {
+        "default": "Alt+Shift+F"
+      },
+      "description": "快速填充当前页面"
+    }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/*.svg"],
+      "matches": ["http://*/*", "https://*/*"]
+    }
+  ]
+}
