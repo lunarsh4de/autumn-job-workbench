@@ -165,6 +165,12 @@ try {
   await client.send('Runtime.evaluate', { expression: `document.querySelector('#catalog-table [data-catalog-track]')?.click()` });
   const trackedMetadata = await waitForEvaluation(client, `(() => { const card=document.querySelector('#kanban .job-card'); return !document.querySelector('#view-board').hidden && card ? {text:card.textContent, companyType:card.textContent.includes('外企（中国大陆）'), jobType:card.textContent.includes('数据算法'), platform:card.textContent.includes('公开清单'), source:card.textContent.includes('岗位库')} : null; })()`);
   if (!trackedMetadata.companyType || !trackedMetadata.jobType || !trackedMetadata.platform || !trackedMetadata.source) throw new Error(`Catalog tracking metadata smoke test failed: ${JSON.stringify(trackedMetadata)}`);
+  await client.send('Runtime.evaluate', { expression: `globalThis.JobTrackerDashboard.showView('board'); chrome.storage.local.set({applications:[{url:'https://jobs.example.test/imported',title:'数据分析师',company:'示例科技',createdAt:Date.now(),resumeProfileId:'data',resumeProfileLabel:'数据版'}]})`, awaitPromise: true });
+  await waitForEvaluation(client, `(() => { const card=[...document.querySelectorAll('#kanban .job-card')].find(item => item.textContent.includes('数据分析师') && item.textContent.includes('示例科技')); return card ? true : null; })()`);
+  await wait(400);
+  const applicationSyncResult = await client.send('Runtime.evaluate', { expression: `(() => { const card=[...document.querySelectorAll('#kanban .job-card')].find(item => item.textContent.includes('数据分析师') && item.textContent.includes('示例科技')); return card ? {text:card.textContent,stage:card.closest('.kanban-column')?.dataset.stage === 'applied',resume:card.textContent.includes('数据版')} : null; })()`, returnByValue: true });
+  const applicationSync = applicationSyncResult.result.value;
+  if (!applicationSync.stage || !applicationSync.resume) throw new Error(`Catalog application sync smoke test failed: ${JSON.stringify(applicationSync)}`);
   await client.send('Runtime.evaluate', { expression: `globalThis.JobTrackerDashboard.showView('catalog')` });
   const resetCheck = await client.send('Runtime.evaluate', {
     expression: `(()=>{document.querySelector('#reset-catalog-filters').click();return {cityOptions:[...document.querySelector('#catalog-city').options].map(option=>option.textContent),result:document.querySelector('#catalog-result-count').textContent};})()`,
@@ -270,7 +276,7 @@ try {
   });
   const clearValue = clearStorage.result.value;
   if (!clearCatalog || clearValue.total !== '0' || clearValue.sync !== null) throw new Error(`Catalog clear smoke test failed: ${JSON.stringify({ clearCatalog, clearValue })}`);
-  console.log(JSON.stringify({ edge, extension, popup: value, dashboard: dashboard.result.value, publicStatus, emptyResumeStatus, syncedResumeStatus, catalogFilters: filterValue, trackedMetadata, resetValue, mobile: mobile.result.value, screenshots: [desktopPath, mobilePath], resumeImport, clearCatalog: clearValue, profileRoot }, null, 2));
+  console.log(JSON.stringify({ edge, extension, popup: value, dashboard: dashboard.result.value, publicStatus, emptyResumeStatus, syncedResumeStatus, catalogFilters: filterValue, trackedMetadata, applicationSync, resetValue, mobile: mobile.result.value, screenshots: [desktopPath, mobilePath], resumeImport, clearCatalog: clearValue, profileRoot }, null, 2));
   await client.send('Browser.close');
 } finally {
   client?.close();

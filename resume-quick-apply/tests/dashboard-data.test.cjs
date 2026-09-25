@@ -41,6 +41,38 @@ test('dashboard preserves catalog classification metadata when tracking a job', 
   assert.equal(item.source, 'catalog');
 });
 
+test('dashboard advances a catalog card when the extension records the same URL', () => {
+  const existing = D.item({
+    id: 'catalog-1', company: '示例科技', title: '数据分析师', url: 'https://jobs.example.test/1',
+    stage: 'watch', priority: 'high', notes: '保留备注', nextActionAt: '2026-09-30T10:00',
+    source: 'catalog', createdAt: 900, updatedAt: 1000
+  });
+  const result = D.mergeApplications([existing], [{
+    url: 'https://jobs.example.test/1', title: '数据分析师', company: '示例科技', createdAt: 2000,
+    resumeProfileId: 'data', resumeProfileLabel: '数据版'
+  }]);
+  assert.equal(result.added, 0);
+  assert.equal(result.updated, 1);
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].id, 'catalog-1');
+  assert.equal(result.items[0].stage, 'applied');
+  assert.equal(result.items[0].source, 'extension');
+  assert.equal(result.items[0].resumeProfileLabel, '数据版');
+  assert.equal(result.items[0].notes, '保留备注');
+  assert.equal(result.items[0].priority, 'high');
+  assert.equal(result.items[0].nextActionAt, '2026-09-30T10:00');
+});
+
+test('dashboard does not regress progressed stages or duplicate repeated applications', () => {
+  const existing = D.item({ id: 'interview-1', company: '示例', title: '岗位', url: 'https://jobs.example.test/2', stage: 'interview', source: 'catalog', updatedAt: 1000 });
+  const application = { url: 'https://jobs.example.test/2', title: '岗位', company: '示例', createdAt: 2000 };
+  const result = D.mergeApplications([existing], [application, application]);
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].stage, 'interview');
+  assert.equal(result.updated, 1);
+  assert.equal(result.added, 0);
+});
+
 test('dashboard summary reports active stages, responses and current-week additions', () => {
   const now = new Date('2026-09-22T12:00:00+08:00').getTime();
   const items = [

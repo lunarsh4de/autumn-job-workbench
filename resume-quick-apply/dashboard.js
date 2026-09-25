@@ -667,9 +667,9 @@
     setResumeSyncStatus(saved);
     const merged = TD.mergeApplications(saved.jobTrackerItems, saved.applications);
     state.items = merged.items;
-    if (merged.added || !Array.isArray(saved.jobTrackerItems)) await storage.set({ jobTrackerItems: state.items });
+    if (merged.added || merged.updated || !Array.isArray(saved.jobTrackerItems)) await storage.set({ jobTrackerItems: state.items });
     renderAll();
-    if (merged.added) flash(`已从插件同步 ${merged.added} 个新岗位。`);
+    if (merged.added || merged.updated) flash(`已从插件同步 ${merged.added ? `${merged.added} 个新岗位` : ''}${merged.added && merged.updated ? '，' : ''}${merged.updated ? `${merged.updated} 个岗位状态` : ''}。`);
   }
 
   populateStages();
@@ -691,9 +691,9 @@
       if (resumeKeys.some(key => changes[key])) storage.get(resumeKeys).then(setResumeSyncStatus).catch(() => {});
       if (!changes.applications) return;
       const merged = TD.mergeApplications(state.items, changes.applications.newValue);
-      if (!merged.added) return;
+      if (!merged.added && !merged.updated) return;
       state.items = merged.items;
-      persist(`已同步 ${merged.added} 个新岗位。`).then(renderAll).catch(error => flash(error.message, true));
+      persist(`已同步${merged.added ? ` ${merged.added} 个新岗位` : ''}${merged.added && merged.updated ? '，' : ''}${merged.updated ? ` ${merged.updated} 个岗位状态` : ''}。`).then(renderAll).catch(error => flash(error.message, true));
     });
   }
 })();

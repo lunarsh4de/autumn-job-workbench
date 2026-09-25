@@ -92,9 +92,32 @@
     const merged = items(existing);
     const urls = new Set(merged.map(entry => entry.url).filter(Boolean));
     let added = 0;
+    let updated = 0;
     for (const application of validApplications(applications)) {
       const url = webUrl(application.url);
-      if (urls.has(url)) continue;
+      const existingIndex = merged.findIndex(entry => entry.url === url);
+      if (existingIndex >= 0) {
+        const current = merged[existingIndex];
+        const resumeProfileId = text(application.resumeProfileId, 80) || current.resumeProfileId;
+        const resumeProfileLabel = text(application.resumeProfileLabel, 80) || current.resumeProfileLabel;
+        const next = item({
+          ...current,
+          title: text(application.title, 240) || current.title,
+          company: companyFor(application) || current.company,
+          stage: ['watch', 'preparing'].includes(current.stage) ? 'applied' : current.stage,
+          source: 'extension',
+          resumeProfileId,
+          resumeProfileLabel,
+          updatedAt: Math.max(current.updatedAt, application.createdAt)
+        });
+        const changed = next && ['title', 'company', 'stage', 'source', 'resumeProfileId', 'resumeProfileLabel', 'updatedAt']
+          .some(key => next[key] !== current[key]);
+        if (changed) {
+          merged[existingIndex] = next;
+          updated++;
+        }
+        continue;
+      }
       const entry = item({
         id: stableId(`${url}|${application.createdAt}`),
         title: text(application.title, 240) || url,
@@ -113,7 +136,7 @@
         added++;
       }
     }
-    return { items: merged.slice(0, 1000), added };
+    return { items: merged.slice(0, 1000), added, updated };
   }
 
   function summary(value, now = Date.now()) {
