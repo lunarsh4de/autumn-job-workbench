@@ -212,7 +212,7 @@ try {
     returnByValue: true
   });
   if (autoSyncSeed.result.value?.skipped) throw new Error('Automatic application sync smoke test could not find an untracked catalog item.');
-  const autoSyncCard = await waitForEvaluation(client, `(()=>{const expected=window.__autoSyncExpected;const card=[...document.querySelectorAll('#kanban .job-card')].find(item=>expected&&item.textContent.includes(expected.title)&&item.textContent.includes('插件同步'));return card?{text:card.textContent,jobType:!expected.jobType||card.textContent.includes(expected.jobType),platform:!expected.platform||card.textContent.includes(expected.platform)}:null;})()`);
+  const autoSyncCard = await waitForEvaluation(client, `(()=>{const expected=window.__autoSyncExpected;const card=[...document.querySelectorAll('#kanban .job-card')].find(item=>expected&&item.textContent.includes(expected.title)&&item.textContent.includes('插件自动识别'));return card?{text:card.textContent,jobType:!expected.jobType||card.textContent.includes(expected.jobType),platform:!expected.platform||card.textContent.includes(expected.platform)}:null;})()`);
   if (!autoSyncCard.jobType || !autoSyncCard.platform) throw new Error(`Automatic application catalog enrichment failed: ${JSON.stringify(autoSyncCard)}`);
   const stageControl = await client.send('Runtime.evaluate', {
     expression: `(()=>{const card=document.querySelector('#kanban .job-card');const control=card?.querySelector('[data-stage-for]');if(!control)return null;control.value='preparing';control.dispatchEvent(new Event('change',{bubbles:true}));return {options:control.options.length,label:control.getAttribute('aria-label')};})()`,

@@ -350,7 +350,11 @@
     if (entry.companyType) meta.append(element('span', '', entry.companyType));
     if (entry.jobType) meta.append(element('span', '', entry.jobType));
     if (entry.platform) meta.append(element('span', '', entry.platform));
-    meta.append(element('span', '', entry.source === 'extension' ? '插件同步' : entry.source === 'catalog' ? '岗位库' : '手动添加'));
+    const sourceLabel = entry.source === 'extension'
+      ? entry.recordMode === 'auto' ? '插件自动识别' : '插件记录'
+      : entry.source === 'catalog' ? '岗位库' : '手动添加';
+    const sourceBadge = element('span', `job-source job-source-${entry.source}-${entry.recordMode || 'default'}`, sourceLabel);
+    meta.append(sourceBadge);
     if (entry.resumeProfileLabel) meta.append(element('span', '', `简历：${entry.resumeProfileLabel}`));
     card.append(meta);
     const stageControl = document.createElement('select');

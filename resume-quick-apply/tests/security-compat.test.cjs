@@ -194,6 +194,14 @@ test('automatic application sync enriches new cards from the local catalog', () 
   assert.match(dashboard, /changes\.applications\.newValue/);
 });
 
+test('automatic application records have a distinct board source badge', () => {
+  const dashboard = source('dashboard.js');
+  const css = source('dashboard.css');
+  assert.match(dashboard, /插件自动识别/);
+  assert.match(dashboard, /job-source-\$\{entry\.source\}/);
+  assert.match(css, /\.job-source-extension-auto/);
+});
+
 test('catalog empty results offer a direct filter reset action', () => {
   const catalog = source('catalog.js');
   assert.match(catalog, /data-reset-catalog/);

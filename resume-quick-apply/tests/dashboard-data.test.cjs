@@ -11,6 +11,7 @@ test('dashboard imports valid extension applications once and preserves managed 
   assert.equal(first.added, 1);
   assert.equal(first.items[0].company, 'DJI');
   assert.equal(first.items[0].stage, 'applied');
+  assert.equal(first.items[0].recordMode, 'auto');
   assert.equal(first.items[0].resumeProfileLabel, '工业设计版');
   first.items[0].stage = 'interview';
   const second = D.mergeApplications(first.items, [application]);
@@ -57,6 +58,7 @@ test('dashboard advances a catalog card when the extension records the same URL'
   assert.equal(result.items[0].id, 'catalog-1');
   assert.equal(result.items[0].stage, 'applied');
   assert.equal(result.items[0].source, 'extension');
+  assert.equal(result.items[0].recordMode, '');
   assert.equal(result.items[0].resumeProfileLabel, '数据版');
   assert.equal(result.items[0].notes, '保留备注');
   assert.equal(result.items[0].priority, 'high');

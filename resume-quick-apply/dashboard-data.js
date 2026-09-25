@@ -11,6 +11,7 @@
   ];
   const stageIds = new Set(stages.map(stage => stage.id));
   const priorities = new Set(['high', 'medium', 'normal']);
+  const recordModes = new Set(['auto', 'manual']);
 
   function text(value, max = 1000) {
     return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -69,6 +70,7 @@
       resumeProfileId: text(value.resumeProfileId, 80),
       resumeProfileLabel: text(value.resumeProfileLabel, 80),
       source: value.source === 'extension' || value.source === 'catalog' ? value.source : 'manual',
+      recordMode: recordModes.has(value.recordMode) ? value.recordMode : '',
       createdAt,
       updatedAt
     };
@@ -100,17 +102,19 @@
         const current = merged[existingIndex];
         const resumeProfileId = text(application.resumeProfileId, 80) || current.resumeProfileId;
         const resumeProfileLabel = text(application.resumeProfileLabel, 80) || current.resumeProfileLabel;
+        const recordMode = application.source === 'auto' || application.source === 'manual' ? application.source : current.recordMode;
         const next = item({
           ...current,
           title: text(application.title, 240) || current.title,
           company: companyFor(application) || current.company,
           stage: ['watch', 'preparing'].includes(current.stage) ? 'applied' : current.stage,
           source: 'extension',
+          recordMode,
           resumeProfileId,
           resumeProfileLabel,
           updatedAt: Math.max(current.updatedAt, application.createdAt)
         });
-        const changed = next && ['title', 'company', 'stage', 'source', 'resumeProfileId', 'resumeProfileLabel', 'updatedAt']
+        const changed = next && ['title', 'company', 'stage', 'source', 'recordMode', 'resumeProfileId', 'resumeProfileLabel', 'updatedAt']
           .some(key => next[key] !== current[key]);
         if (changed) {
           merged[existingIndex] = next;
@@ -127,6 +131,7 @@
         resumeProfileId: text(application.resumeProfileId, 80),
         resumeProfileLabel: text(application.resumeProfileLabel, 80),
         source: 'extension',
+        recordMode: application.source === 'auto' || application.source === 'manual' ? application.source : '',
         createdAt: application.createdAt,
         updatedAt: application.createdAt
       });
