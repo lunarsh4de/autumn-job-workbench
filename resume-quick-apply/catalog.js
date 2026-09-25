@@ -12,6 +12,9 @@
   let resumeCandidate = null;
   let publicSyncing = false;
   let importing = false;
+  let catalogReady = false;
+  let pendingResumeSync = false;
+  let resumeSyncGeneration = 0;
 
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -482,10 +485,16 @@
   }
 
   async function syncResumeProfile(saved, announce = true) {
+    if (!catalogReady) {
+      pendingResumeSync = true;
+      return false;
+    }
+    const generation = ++resumeSyncGeneration;
     const automatic = CD.deriveResumePreferences(saved);
     state.autoPreferences = automatic;
     state.preferences = CD.mergePreferences(state.manualPreferences, automatic);
     await dashboard.storage.set({ resumeAutoPreferences: automatic });
+    if (generation !== resumeSyncGeneration) return false;
     state.items = CD.rescore(state.items, state.preferences);
     await DB.replaceAll(state.items);
     dashboard.setResumeSyncStatus?.(saved);
@@ -578,7 +587,13 @@
 
   installEvents();
   installResumeUpload();
-  load().catch(error => dashboard.flash(`读取岗位库失败：${error.message}`, true));
+  load().then(async () => {
+    catalogReady = true;
+    if (!pendingResumeSync) return;
+    pendingResumeSync = false;
+    const saved = await dashboard.storage.get(['resumeProfiles', 'activeProfileId', 'activeProfileLabel', 'profile', 'experiences']);
+    await syncResumeProfile(saved);
+  }).catch(error => dashboard.flash(`读取岗位库失败：${error.message}`, true));
 
   if (globalThis.chrome?.storage?.onChanged?.addListener) {
     chrome.storage.onChanged.addListener((changes, area) => {

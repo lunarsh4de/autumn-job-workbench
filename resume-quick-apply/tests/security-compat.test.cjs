@@ -160,6 +160,16 @@ test('catalog empty results offer a direct filter reset action', () => {
   assert.match(catalog, /resetFilters\(\)/);
 });
 
+test('resume sync waits for catalog readiness and ignores stale scoring generations', () => {
+  const catalog = source('catalog.js');
+  assert.match(catalog, /let catalogReady = false/);
+  assert.match(catalog, /if \(!catalogReady\) \{/);
+  assert.match(catalog, /pendingResumeSync = true/);
+  assert.match(catalog, /const generation = \+\+resumeSyncGeneration/);
+  assert.match(catalog, /if \(generation !== resumeSyncGeneration\) return false/);
+  assert.match(catalog, /catalogReady = true/);
+});
+
 test('resume parsers are self-hosted with licenses and no remote script tags', () => {
   const path = require('node:path');
   const root = path.join(__dirname, '..', 'vendor');
