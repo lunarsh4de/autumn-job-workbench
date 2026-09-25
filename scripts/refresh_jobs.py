@@ -48,8 +48,10 @@ CITY_PROVINCES = {
 PROVINCES = tuple({"北京", "上海", "天津", "重庆", "广东", "浙江", "江苏", "四川", "湖北", "湖南", "河南", "陕西", "安徽", "福建", "山东", "辽宁", "黑龙江", "吉林", "江西", "云南", "贵州", "山西", "河北", "新疆", "甘肃", "海南", "广西", "内蒙古", "西藏", "宁夏", "青海", "香港", "澳门", "台湾"})
 FOREIGN_COMPANY_PATTERN = re.compile(r"微软|英特尔|英伟达|苹果|亚马逊|谷歌|Google|Microsoft|Amazon|Apple|IBM|SAP|西门子|博世(?:（中国|中国)|联合利华|宝洁|欧莱雅|耐克|阿迪达斯|德勤|普华永道|安永|毕马威|埃森哲|汇丰|渣打|花旗|摩根|可口可乐|百事|星巴克|麦肯锡|波士顿咨询|贝恩|Airbnb|Stripe|Datadog|Cloudflare|Coinbase", re.I)
 STATE_COMPANY_PATTERN = re.compile(r"国企|央企|国有企业|事业单位|国家电网|南方电网|中国石油|中石油|中国石化|中石化|中国移动|中国联通|中国电信|中国建筑|中建集团|中国中铁|中国铁建|中国交建|中国航天|中国航空|中国兵器|中国烟草|中国铁路|国铁|中核|中航|中粮|中储粮|中国船舶|中国电子|中国华能|国家能源", re.I)
-MAINLAND_LOCATION_PATTERN = re.compile(r"北京|上海|天津|重庆|广州|深圳|杭州|宁波|南京|苏州|无锡|成都|武汉|长沙|郑州|西安|合肥|福州|厦门|济南|青岛|沈阳|大连|哈尔滨|长春|南昌|昆明|贵阳|太原|石家庄|乌鲁木齐|兰州|海口|南宁|呼和浩特|拉萨|银川|西宁|中国大陆|中国内地|Mainland China|China(?:\s|[-,]|$)", re.I)
-MAINLAND_SPECIFIC_LOCATION_PATTERN = re.compile(r"北京|上海|天津|重庆|广州|深圳|杭州|宁波|南京|苏州|无锡|成都|武汉|长沙|郑州|西安|合肥|福州|厦门|济南|青岛|沈阳|大连|哈尔滨|长春|南昌|昆明|贵阳|太原|石家庄|乌鲁木齐|兰州|海口|南宁|呼和浩特|拉萨|银川|西宁|中国大陆|中国内地|Mainland China", re.I)
+MAINLAND_CITY_NAMES = tuple(city for city, province in CITY_PROVINCES.items() if province not in {"香港", "澳门", "台湾"})
+MAINLAND_CITY_PATTERN = "|".join(re.escape(city) for city in MAINLAND_CITY_NAMES)
+MAINLAND_LOCATION_PATTERN = re.compile(rf"(?:{MAINLAND_CITY_PATTERN})|中国大陆|中国内地|Mainland China|China(?:\s|[-,]|$)", re.I)
+MAINLAND_SPECIFIC_LOCATION_PATTERN = re.compile(rf"(?:{MAINLAND_CITY_PATTERN})|中国大陆|中国内地|Mainland China", re.I)
 NON_MAINLAND_LOCATION_PATTERN = re.compile(r"香港|澳门|台湾|Hong Kong|Macau|Taipei|海外|海外地区", re.I)
 
 

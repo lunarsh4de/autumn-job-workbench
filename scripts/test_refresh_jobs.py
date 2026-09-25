@@ -95,8 +95,10 @@ class RefreshJobsTests(unittest.TestCase):
     def test_normalize_keeps_mixed_mainland_and_hong_kong_roles_in_mainland_bucket(self):
         source = {"id": "test", "name": "测试源", "url": "https://example.com"}
         mainland = refresh_jobs.normalize({"company": "埃森哲", "title": "校招", "location": "广州、深圳、北京、上海、香港", "companyType": "外企"}, source)
+        expanded_mainland = refresh_jobs.normalize({"company": "埃森哲", "title": "校招", "location": "嘉兴、香港", "companyType": "外企"}, source)
         hong_kong_only = refresh_jobs.normalize({"company": "埃森哲", "title": "校招", "location": "香港", "companyType": "外企"}, source)
         self.assertEqual(mainland["companyType"], "外企（中国大陆）")
+        self.assertEqual(expanded_mainland["companyType"], "外企（中国大陆）")
         self.assertEqual(hong_kong_only["companyType"], "外企（其他地区）")
 
 
