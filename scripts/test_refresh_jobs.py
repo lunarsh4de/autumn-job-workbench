@@ -53,6 +53,9 @@ class RefreshJobsTests(unittest.TestCase):
         self.assertEqual(refresh_jobs.classify_job_type({"title": "User Growth Intern"}), "运营市场")
         self.assertEqual(refresh_jobs.classify_job_type({"title": "软件实施工程师"}), "技术研发")
         self.assertEqual(refresh_jobs.classify_job_type({"title": "系统策划"}), "产品项目")
+        self.assertEqual(refresh_jobs.classify_job_type({"title": "文员实习生"}), "职能管培")
+        self.assertEqual(refresh_jobs.classify_job_type({"title": "集控巡检"}), "供应链制造")
+        self.assertEqual(refresh_jobs.classify_job_type({"title": "茶原料开发"}), "供应链制造")
 
     def test_greenhouse_keeps_mainland_china_and_excludes_hong_kong(self):
         payload = {"jobs": [

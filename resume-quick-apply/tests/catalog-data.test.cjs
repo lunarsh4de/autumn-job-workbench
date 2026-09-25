@@ -63,6 +63,9 @@ test('catalog classifies common bilingual job titles into bounded categories', (
   assert.equal(C.classifyJobType({ title: 'User Growth Intern' }), '运营市场');
   assert.equal(C.classifyJobType({ title: '软件实施工程师' }), '技术研发');
   assert.equal(C.classifyJobType({ title: '系统策划' }), '产品项目');
+  assert.equal(C.classifyJobType({ title: '文员实习生' }), '职能管培');
+  assert.equal(C.classifyJobType({ title: '集控巡检' }), '供应链制造');
+  assert.equal(C.classifyJobType({ title: '茶原料开发' }), '供应链制造');
 });
 
 test('catalog normalizes mainland foreign-company labels and derives resume preferences', () => {
