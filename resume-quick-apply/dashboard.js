@@ -410,6 +410,19 @@
     renderSchedule('#timeline', scheduleEvents(filteredItems()), false);
   }
 
+  function setSidebarOpen(open) {
+    const sidebar = document.querySelector('#sidebar');
+    const toggle = document.querySelector('#mobile-menu');
+    if (!sidebar) return;
+    const isOpen = Boolean(open);
+    sidebar.classList.toggle('open', isOpen);
+    if (toggle) {
+      toggle.setAttribute('aria-expanded', String(isOpen));
+      toggle.setAttribute('aria-label', isOpen ? '关闭导航' : '打开导航');
+      toggle.title = isOpen ? '关闭导航' : '打开导航';
+    }
+  }
+
   function showView(name) {
     const view = document.querySelector(`#view-${name}`);
     if (!view) return;
@@ -417,7 +430,7 @@
     for (const candidate of document.querySelectorAll('.view')) candidate.hidden = candidate !== view;
     for (const item of document.querySelectorAll('[data-view]')) item.classList.toggle('active', item.dataset.view === name);
     document.querySelector('#view-title').textContent = view.dataset.title;
-    document.querySelector('#sidebar').classList.remove('open');
+    setSidebarOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -539,7 +552,14 @@
   function installEvents() {
     document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => showView(button.dataset.view)));
     document.querySelectorAll('[data-go-view]').forEach(button => button.addEventListener('click', () => showView(button.dataset.goView)));
-    document.querySelector('#mobile-menu').addEventListener('click', () => document.querySelector('#sidebar').classList.toggle('open'));
+    const mobileMenu = document.querySelector('#mobile-menu');
+    const sidebar = document.querySelector('#sidebar');
+    mobileMenu.addEventListener('click', () => setSidebarOpen(!sidebar.classList.contains('open')));
+    document.addEventListener('keydown', event => {
+      if (event.key !== 'Escape' || !sidebar.classList.contains('open')) return;
+      setSidebarOpen(false);
+      mobileMenu.focus();
+    });
     document.querySelector('#new-job').addEventListener('click', () => openEditor());
     document.querySelector('#close-dialog').addEventListener('click', closeEditor);
     document.querySelector('#cancel-dialog').addEventListener('click', closeEditor);

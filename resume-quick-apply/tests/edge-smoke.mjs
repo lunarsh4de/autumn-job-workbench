@@ -164,10 +164,18 @@ try {
   await client.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await wait(250);
   const mobile = await client.send('Runtime.evaluate', {
-    expression: `({overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,menu:getComputedStyle(document.querySelector('#mobile-menu')).display,sidebar:getComputedStyle(document.querySelector('#sidebar')).transform})`,
+    expression: `(()=>{
+      const menu=document.querySelector('#mobile-menu');
+      const sidebar=document.querySelector('#sidebar');
+      const before={expanded:menu.getAttribute('aria-expanded'),label:menu.getAttribute('aria-label')};
+      menu.click();
+      const opened={expanded:menu.getAttribute('aria-expanded'),label:menu.getAttribute('aria-label'),open:sidebar.classList.contains('open')};
+      document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+      return {overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,menu:getComputedStyle(menu).display,sidebar:getComputedStyle(sidebar).transform,before,opened,closed:{expanded:menu.getAttribute('aria-expanded'),label:menu.getAttribute('aria-label'),open:sidebar.classList.contains('open')}};
+    })()`,
     returnByValue: true
   });
-  if (mobile.result.value.overflow || mobile.result.value.menu === 'none') throw new Error(`Dashboard mobile smoke test failed: ${JSON.stringify(mobile.result.value)}`);
+  if (mobile.result.value.overflow || mobile.result.value.menu === 'none' || mobile.result.value.before.expanded !== 'false' || !mobile.result.value.opened.open || mobile.result.value.opened.expanded !== 'true' || mobile.result.value.closed.open || mobile.result.value.closed.expanded !== 'false') throw new Error(`Dashboard mobile smoke test failed: ${JSON.stringify(mobile.result.value)}`);
   const mobileShot = await client.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
   const mobilePath = join(screenshotRoot, 'dashboard-mobile.png');
   writeFileSync(mobilePath, Buffer.from(mobileShot.data, 'base64'));
