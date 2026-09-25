@@ -135,13 +135,12 @@ test('GitHub sync preserves refreshed token metadata and reports backup freshnes
   assert.match(source('dashboard.html'), /id="github-cancel"/);
 });
 
-test('dashboard exposes a disabled button affordance and keeps profile toasts out of backup actions', () => {
+test('dashboard exposes a disabled button affordance and keeps mobile toasts in flow', () => {
   const css = source('dashboard.css');
   const dashboard = source('dashboard.js');
   assert.match(css, /\.button:disabled \{[^}]*cursor: not-allowed/);
-  assert.match(css, /#view-profile \{ padding-bottom: 112px; \}/);
-  assert.match(dashboard, /document\.documentElement\.dataset\.activeView = name/);
-  assert.match(dashboard, /#view-profile:not\(\[hidden\]\)/);
+  assert.match(css, /\.toast \{ position: static; z-index: auto; max-width: none; margin: 8px 16px 0; \}/);
+  assert.doesNotMatch(dashboard, /#view-profile:not\(\[hidden\]\)/);
 });
 
 test('catalog import exposes an in-dialog error state and prevents concurrent submissions', () => {

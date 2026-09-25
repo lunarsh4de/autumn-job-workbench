@@ -212,6 +212,10 @@ try {
   writeFileSync(desktopPath, Buffer.from(desktopShot.data, 'base64'));
   await client.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await wait(250);
+  await client.send('Runtime.evaluate', { expression: `document.querySelector('[data-view="catalog"]').click()` });
+  const catalogMobileShot = await client.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+  const catalogMobilePath = join(screenshotRoot, 'dashboard-catalog-mobile.png');
+  writeFileSync(catalogMobilePath, Buffer.from(catalogMobileShot.data, 'base64'));
   const mobile = await client.send('Runtime.evaluate', {
     expression: `(()=>{
       const menu=document.querySelector('#mobile-menu');
@@ -228,11 +232,11 @@ try {
       const escaped={expanded:menu.getAttribute('aria-expanded'),label:menu.getAttribute('aria-label'),open:sidebar.classList.contains('open'),backdropVisible:!backdrop.hidden};
       menu.click();
       backdrop.click();
-      return {overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,menu:getComputedStyle(menu).display,sidebar:getComputedStyle(sidebar).transform,toastBottom:getComputedStyle(document.querySelector('#toast')).bottom,before,opened,navigated,escaped,closed:{expanded:menu.getAttribute('aria-expanded'),label:menu.getAttribute('aria-label'),open:sidebar.classList.contains('open'),backdropVisible:!backdrop.hidden,ariaHidden:sidebar.getAttribute('aria-hidden'),inert:sidebar.hasAttribute('inert')},focus:document.activeElement===menu};
+      return {overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,menu:getComputedStyle(menu).display,sidebar:getComputedStyle(sidebar).transform,toastPosition:getComputedStyle(document.querySelector('#toast')).position,before,opened,navigated,escaped,closed:{expanded:menu.getAttribute('aria-expanded'),label:menu.getAttribute('aria-label'),open:sidebar.classList.contains('open'),backdropVisible:!backdrop.hidden,ariaHidden:sidebar.getAttribute('aria-hidden'),inert:sidebar.hasAttribute('inert')},focus:document.activeElement===menu};
     })()`,
     returnByValue: true
   });
-  if (mobile.result.value.overflow || mobile.result.value.menu === 'none' || mobile.result.value.toastBottom !== '16px' || mobile.result.value.before.expanded !== 'false' || mobile.result.value.before.ariaHidden !== 'true' || !mobile.result.value.before.inert || !mobile.result.value.opened.open || !mobile.result.value.opened.backdropVisible || mobile.result.value.opened.expanded !== 'true' || mobile.result.value.opened.ariaHidden !== 'false' || mobile.result.value.opened.inert || mobile.result.value.escaped.open || mobile.result.value.escaped.backdropVisible || mobile.result.value.closed.open || mobile.result.value.closed.expanded !== 'false' || mobile.result.value.closed.backdropVisible || mobile.result.value.closed.ariaHidden !== 'true' || !mobile.result.value.closed.inert || !mobile.result.value.focus || !mobile.result.value.navigated.viewVisible || mobile.result.value.navigated.open || mobile.result.value.navigated.backdropVisible || mobile.result.value.navigated.ariaHidden !== 'true' || !mobile.result.value.navigated.inert || !mobile.result.value.navigated.focus) throw new Error(`Dashboard mobile smoke test failed: ${JSON.stringify(mobile.result.value)}`);
+  if (mobile.result.value.overflow || mobile.result.value.menu === 'none' || mobile.result.value.toastPosition !== 'static' || mobile.result.value.before.expanded !== 'false' || mobile.result.value.before.ariaHidden !== 'true' || !mobile.result.value.before.inert || !mobile.result.value.opened.open || !mobile.result.value.opened.backdropVisible || mobile.result.value.opened.expanded !== 'true' || mobile.result.value.opened.ariaHidden !== 'false' || mobile.result.value.opened.inert || mobile.result.value.escaped.open || mobile.result.value.escaped.backdropVisible || mobile.result.value.closed.open || mobile.result.value.closed.expanded !== 'false' || mobile.result.value.closed.backdropVisible || mobile.result.value.closed.ariaHidden !== 'true' || !mobile.result.value.closed.inert || !mobile.result.value.focus || !mobile.result.value.navigated.viewVisible || mobile.result.value.navigated.open || mobile.result.value.navigated.backdropVisible || mobile.result.value.navigated.ariaHidden !== 'true' || !mobile.result.value.navigated.inert || !mobile.result.value.navigated.focus) throw new Error(`Dashboard mobile smoke test failed: ${JSON.stringify(mobile.result.value)}`);
   const mobileShot = await client.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
   const mobilePath = join(screenshotRoot, 'dashboard-mobile.png');
   writeFileSync(mobilePath, Buffer.from(mobileShot.data, 'base64'));
@@ -282,7 +286,7 @@ try {
   });
   const clearValue = clearStorage.result.value;
   if (!clearCatalog || clearValue.total !== '0' || clearValue.sync !== null) throw new Error(`Catalog clear smoke test failed: ${JSON.stringify({ clearCatalog, clearValue })}`);
-  console.log(JSON.stringify({ edge, extension, popup: value, dashboard: dashboard.result.value, publicStatus, emptyResumeStatus, syncedResumeStatus, catalogFilters: filterValue, trackedMetadata, applicationSync, resetValue, mobile: mobile.result.value, screenshots: [desktopPath, mobilePath], resumeImport, clearCatalog: clearValue, profileRoot }, null, 2));
+  console.log(JSON.stringify({ edge, extension, popup: value, dashboard: dashboard.result.value, publicStatus, emptyResumeStatus, syncedResumeStatus, catalogFilters: filterValue, trackedMetadata, applicationSync, resetValue, mobile: mobile.result.value, screenshots: [desktopPath, catalogMobilePath, mobilePath], resumeImport, clearCatalog: clearValue, profileRoot }, null, 2));
   await client.send('Browser.close');
 } finally {
   client?.close();

@@ -39,10 +39,6 @@
 
   function flash(message, error = false) {
     const toast = document.querySelector('#toast');
-    if (document.querySelector('#view-profile:not([hidden])')) {
-      toast.hidden = true;
-      return;
-    }
     toast.textContent = message;
     toast.dataset.error = String(error);
     toast.hidden = false;
@@ -452,12 +448,6 @@
     const sidebar = document.querySelector('#sidebar');
     const wasSidebarOpen = sidebar?.classList.contains('open');
     state.view = name;
-    document.documentElement.dataset.activeView = name;
-    if (name === 'profile') {
-      const toast = document.querySelector('#toast');
-      if (toast) toast.hidden = true;
-      clearTimeout(flash.timer);
-    }
     for (const candidate of document.querySelectorAll('.view')) candidate.hidden = candidate !== view;
     for (const item of document.querySelectorAll('[data-view]')) item.classList.toggle('active', item.dataset.view === name);
     document.querySelector('#view-title').textContent = view.dataset.title;
