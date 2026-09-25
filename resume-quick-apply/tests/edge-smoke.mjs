@@ -186,6 +186,11 @@ try {
   const applicationSync = applicationSyncResult.result.value;
   if (!applicationSync.stage || !applicationSync.resume) throw new Error(`Catalog application sync smoke test failed: ${JSON.stringify(applicationSync)}`);
   await client.send('Runtime.evaluate', { expression: `globalThis.JobTrackerDashboard.showView('catalog')` });
+  const trackedControl = await client.send('Runtime.evaluate', {
+    expression: `(()=>{const button=document.querySelector('#catalog-table [data-catalog-track]');return button?{text:button.textContent,disabled:button.disabled}:null;})()`,
+    returnByValue: true
+  });
+  if (!trackedControl.result.value || trackedControl.result.value.text !== '已在看板' || !trackedControl.result.value.disabled) throw new Error(`Catalog tracked-control smoke test failed: ${JSON.stringify(trackedControl.result.value)}`);
   const resetCheck = await client.send('Runtime.evaluate', {
     expression: `(()=>{document.querySelector('#reset-catalog-filters').click();return {cityOptions:[...document.querySelector('#catalog-city').options].map(option=>option.textContent),result:document.querySelector('#catalog-result-count').textContent};})()`,
     returnByValue: true

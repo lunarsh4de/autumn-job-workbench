@@ -41,6 +41,10 @@
     return `${score} · 一般`;
   }
 
+  function isTracked(job) {
+    return dashboard.getItems().some(entry => (job.url && entry.url === job.url) || (entry.company === job.company && entry.title === job.title));
+  }
+
   function filteredItems() {
     const query = state.query.toLowerCase();
     const list = state.items.filter(job => {
@@ -171,9 +175,12 @@
       const detail = element('button', 'button compact secondary', '岗位详情');
       detail.type = 'button';
       detail.dataset.catalogDetails = job.id;
-      const track = element('button', 'button compact secondary', '加入看板');
+      const tracked = isTracked(job);
+      const track = element('button', 'button compact secondary', tracked ? '已在看板' : '加入看板');
       track.type = 'button';
       track.dataset.catalogTrack = job.id;
+      track.disabled = tracked;
+      track.setAttribute('aria-label', tracked ? '已在申请看板中' : '加入申请看板');
       actions.append(detail, track);
       actionsCell.append(actions);
       row.append(company, titleCell, scoreCell, location, platform, actionsCell);
@@ -197,6 +204,10 @@
     link.hidden = !job.url;
     const track = document.querySelector('#catalog-detail-track');
     track.dataset.catalogTrack = job.id;
+    const tracked = isTracked(job);
+    track.textContent = tracked ? '已在看板' : '加入申请看板';
+    track.disabled = tracked;
+    track.setAttribute('aria-label', tracked ? '已在申请看板中' : '加入申请看板');
     dialog.showModal();
   }
 
@@ -466,7 +477,7 @@
       const track = event.target.closest('[data-catalog-track]');
       if (track) {
         const job = state.items.find(item => item.id === track.dataset.catalogTrack);
-        if (job) dashboard.addFromCatalog(job).then(() => document.querySelector('#catalog-detail-dialog').open && document.querySelector('#catalog-detail-dialog').close()).catch(error => dashboard.flash(error.message, true));
+        if (job && !track.disabled) dashboard.addFromCatalog(job).then(() => { renderTable(); document.querySelector('#catalog-detail-dialog').open && document.querySelector('#catalog-detail-dialog').close(); }).catch(error => dashboard.flash(error.message, true));
       }
     });
   }

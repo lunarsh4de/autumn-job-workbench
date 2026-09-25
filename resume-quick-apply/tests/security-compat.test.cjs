@@ -185,6 +185,14 @@ test('catalog source health exposes partial failures in visible status markup', 
   assert.match(css, /\.public-sync-detail/);
 });
 
+test('catalog tracking controls reflect existing application-board records', () => {
+  const catalog = source('catalog.js');
+  assert.match(catalog, /function isTracked\(job\)/);
+  assert.match(catalog, /已在看板/);
+  assert.match(catalog, /track\.disabled = tracked/);
+  assert.match(catalog, /if \(job && !track\.disabled\)/);
+});
+
 test('resume parsers are self-hosted with licenses and no remote script tags', () => {
   const path = require('node:path');
   const root = path.join(__dirname, '..', 'vendor');
