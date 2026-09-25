@@ -126,6 +126,8 @@ try {
   });
   await client.send('Page.navigate', { url: `chrome-extension://${extensionId}/dashboard.html` });
   await waitForEvaluation(client, `document.querySelectorAll('#view-catalog .metric-card').length===4 && document.querySelector('#catalog-total').textContent!=='0'`);
+  const publicStatus = await waitForEvaluation(client, `(() => { const node=document.querySelector('#public-sync-status'); return node && node.dataset.state !== 'loading' ? {state:node.dataset.state,text:node.textContent} : null; })()`);
+  if (!publicStatus || /Failed to fetch|NetworkError|Load failed/i.test(publicStatus.text)) throw new Error(`Public source status smoke test failed: ${JSON.stringify(publicStatus)}`);
   await client.send('Runtime.evaluate', {
     expression: `(()=>{document.querySelector('#open-import').click();const input=document.querySelector('#catalog-paste');input.value='公司,岗位,地点,链接,平台,标签\\n示例科技,数据分析师,上海,https://jobs.example.test/imported,公开清单,"SQL,Python"';input.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#import-form').requestSubmit();})()`
   });
@@ -216,7 +218,7 @@ try {
       throw new Error(`Resume import did not persist structured experiences: ${JSON.stringify(resumeImport.applied)}`);
     }
   }
-  console.log(JSON.stringify({ edge, extension, popup: value, dashboard: dashboard.result.value, catalogFilters: filterValue, mobile: mobile.result.value, screenshots: [desktopPath, mobilePath], resumeImport, profileRoot }, null, 2));
+  console.log(JSON.stringify({ edge, extension, popup: value, dashboard: dashboard.result.value, publicStatus, catalogFilters: filterValue, mobile: mobile.result.value, screenshots: [desktopPath, mobilePath], resumeImport, profileRoot }, null, 2));
   await client.send('Browser.close');
 } finally {
   client?.close();

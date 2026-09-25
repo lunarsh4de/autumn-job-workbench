@@ -236,19 +236,33 @@
     dialog.showModal();
   }
 
-  async function syncPublicFeed(force = false) {
+  function setPublicStatus(text, state = '', detail = '') {
     const status = document.querySelector('#public-sync-status');
+    if (!status) return;
+    status.textContent = text;
+    status.dataset.state = state;
+    if (detail) status.title = detail;
+    else status.removeAttribute('title');
+  }
+
+  function publicSyncError(error) {
+    const detail = String(error?.message || '');
+    if (/failed to fetch|network|load failed|fetch/i.test(detail)) return '公共源暂不可用，已保留本地岗位；可稍后重试。';
+    return `公共源同步失败：${detail || '请稍后重试。'}`;
+  }
+
+  async function syncPublicFeed(force = false) {
     const saved = await dashboard.storage.get(['publicCatalogSync']);
     const previous = saved.publicCatalogSync;
     if (!force && previous?.at && Date.now() - previous.at < 6 * 60 * 60 * 1000) {
-      status.textContent = `公共源已同步 ${previous.total || 0} 条（${new Date(previous.at).toLocaleString('zh-CN')}）`;
+      setPublicStatus(`公共源已同步 ${previous.total || 0} 条（${new Date(previous.at).toLocaleString('zh-CN')}）`, 'ready');
       return false;
     }
-    status.textContent = '正在同步 GitHub Actions 公共岗位源...';
+    setPublicStatus('正在同步 GitHub Actions 公共岗位源...', 'loading');
     try {
       const response = await fetch(`jobs.json?refresh=${Date.now()}`, { cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer' });
       if (response.status === 404) {
-        status.textContent = '当前为插件/本地模式，可手动导入；Pages 发布后将自动同步';
+        setPublicStatus('当前为插件/本地模式，可手动导入；Pages 发布后将自动同步', 'local');
         return false;
       }
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -265,13 +279,13 @@
       const generatedAt = document?.meta?.generatedAt || '';
       const sync = { at: Date.now(), total: parsed.length, generatedAt };
       await dashboard.storage.set({ publicCatalogSync: sync });
-      status.textContent = `公共源 ${parsed.length} 条，更新于 ${generatedAt ? new Date(generatedAt).toLocaleString('zh-CN') : '刚刚'}`;
+      setPublicStatus(`公共源 ${parsed.length} 条，更新于 ${generatedAt ? new Date(generatedAt).toLocaleString('zh-CN') : '刚刚'}`, 'ready');
       render();
       if (force) dashboard.flash(`公共岗位已同步：新增 ${merged.added} 条，更新 ${merged.updated} 条。`);
       return true;
     } catch (error) {
-      status.textContent = `公共源同步失败：${error.message}`;
-      if (force) dashboard.flash(`公共岗位同步失败：${error.message}`, true);
+      setPublicStatus(publicSyncError(error), 'error', error?.message || '');
+      if (force) dashboard.flash('公共岗位暂时无法同步，请稍后重试；本地岗位未受影响。', true);
       return false;
     }
   }
