@@ -17,6 +17,27 @@
   const signOut = document.querySelector('#github-sign-out');
   let token = '';
 
+  function updateProfileUi(login = '') {
+    const label = document.querySelector('#profile-entry-label');
+    const entryStatus = document.querySelector('#profile-entry-status');
+    const centerName = document.querySelector('#profile-center-name');
+    const centerStatus = document.querySelector('#profile-center-status');
+    const avatar = document.querySelector('#profile-avatar');
+    if (login) {
+      if (label) label.textContent = `@${login}`;
+      if (entryStatus) entryStatus.textContent = 'GitHub 已连接';
+      if (centerName) centerName.textContent = `@${login}`;
+      if (centerStatus) centerStatus.textContent = 'GitHub 已连接，数据仍按需备份';
+      if (avatar) avatar.textContent = login.slice(0, 2).toUpperCase();
+    } else {
+      if (label) label.textContent = '个人中心';
+      if (entryStatus) entryStatus.textContent = '本地模式';
+      if (centerName) centerName.textContent = '本地求职者';
+      if (centerStatus) centerStatus.textContent = '资料保存在当前浏览器';
+      if (avatar) avatar.textContent = '我';
+    }
+  }
+
   function setStatus(message, error = false) {
     status.textContent = message;
     status.dataset.error = String(error);
@@ -88,6 +109,7 @@
       signIn.hidden = true;
       save.disabled = false;
       signOut.hidden = false;
+      updateProfileUi(user.login);
       setStatus(`已连接 GitHub：${user.login}。个人备份仍需点击“保存到 GitHub”。`);
     } catch (error) {
       token = '';
@@ -128,6 +150,7 @@
     signIn.hidden = false;
     signOut.hidden = true;
     save.disabled = true;
+    updateProfileUi('');
     setStatus('已退出 GitHub，本地数据未删除。');
   }
 
@@ -142,7 +165,10 @@
       signIn.hidden = true;
       save.disabled = false;
       signOut.hidden = false;
+      updateProfileUi(user.login);
       setStatus(`已连接 GitHub：${user.login}。`);
-    } catch { token = ''; await storage.set({ githubGistToken: null, githubGistRefreshToken: null, githubGistExpiresAt: null, githubUserLogin: null }); }
+    } catch { token = ''; await storage.set({ githubGistToken: null, githubGistRefreshToken: null, githubGistExpiresAt: null, githubUserLogin: null }); updateProfileUi(''); }
+  }).then(() => {
+    if (!token) updateProfileUi('');
   }).catch(() => {});
 })();

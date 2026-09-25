@@ -48,11 +48,17 @@
 
   function setResumeSyncStatus(saved = {}) {
     const node = document.querySelector('#resume-sync-status');
-    if (!node) return;
     const label = typeof saved.activeProfileLabel === 'string' ? saved.activeProfileLabel.trim() : '';
     const profiles = Array.isArray(saved.resumeProfiles) ? saved.resumeProfiles : [];
     const active = profiles.find(item => item?.id === saved.activeProfileId) || profiles.find(item => item?.label === label);
     const hasResumeData = Boolean(label || saved.profile || saved.experiences || active);
+    const profileStatus = document.querySelector('#profile-resume-status');
+    const profileEntryStatus = document.querySelector('#profile-entry-status');
+    if (profileStatus) profileStatus.textContent = hasResumeData ? '已同步' : '未同步';
+    if (profileEntryStatus && !document.querySelector('#profile-center-name')?.textContent?.startsWith('@')) {
+      profileEntryStatus.textContent = hasResumeData ? '简历已同步' : '本地模式';
+    }
+    if (!node) return;
     if (!hasResumeData) {
       node.textContent = '尚未检测到插件简历';
       node.dataset.state = 'empty';
@@ -62,6 +68,17 @@
     const stamp = Number.isFinite(updatedAt) ? ` · 最近同步 ${dateTimeFormat.format(new Date(updatedAt))}` : '';
     node.textContent = `插件简历已同步：${label || active?.label || '当前档案'}${stamp}`;
     node.dataset.state = 'ready';
+  }
+
+  function renderProfileCenter() {
+    const summary = TD.summary(state.items);
+    const total = document.querySelector('#profile-job-count');
+    const active = document.querySelector('#profile-active-count');
+    if (total) total.textContent = String(summary.total);
+    if (active) active.textContent = String(summary.active);
+    const avatar = document.querySelector('#profile-avatar');
+    const name = document.querySelector('#profile-center-name')?.textContent || '本地求职者';
+    if (avatar) avatar.textContent = name.startsWith('@') ? name.slice(1, 3).toUpperCase() : '我';
   }
 
   function initials(company) {
@@ -125,6 +142,7 @@
     renderJobs();
     renderCompanies();
     renderCalendar();
+    renderProfileCenter();
   }
 
   function renderOverview() {
@@ -568,6 +586,11 @@
       moveJob(event.dataTransfer.getData('text/plain'), column.dataset.stage).catch(error => flash(error.message, true));
     });
     document.querySelector('#open-popup').addEventListener('click', () => {
+      if (globalThis.chrome?.runtime?.id && globalThis.chrome?.tabs?.create) {
+        chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
+      } else showView('sources');
+    });
+    document.querySelector('#profile-open-popup').addEventListener('click', () => {
       if (globalThis.chrome?.runtime?.id && globalThis.chrome?.tabs?.create) {
         chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
       } else showView('sources');
