@@ -320,7 +320,7 @@
     if (entry.companyType) meta.append(element('span', '', entry.companyType));
     if (entry.jobType) meta.append(element('span', '', entry.jobType));
     if (entry.platform) meta.append(element('span', '', entry.platform));
-    meta.append(element('span', '', entry.source === 'extension' ? '插件同步' : '手动添加'));
+    meta.append(element('span', '', entry.source === 'extension' ? '插件同步' : entry.source === 'catalog' ? '岗位库' : '手动添加'));
     if (entry.resumeProfileLabel) meta.append(element('span', '', `简历：${entry.resumeProfileLabel}`));
     card.append(meta);
     const next = element('div', 'job-next');
@@ -541,7 +541,7 @@
       platform: job.platform,
       stage: 'watch',
       priority: Number.isFinite(job.matchScore) && job.matchScore >= 70 ? 'high' : 'normal',
-      source: 'manual',
+      source: 'catalog',
       createdAt: now,
       updatedAt: now
     });

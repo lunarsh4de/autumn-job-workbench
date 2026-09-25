@@ -32,12 +32,13 @@ test('dashboard rejects unsafe links and normalizes malformed fields', () => {
 
 test('dashboard preserves catalog classification metadata when tracking a job', () => {
   const item = D.item({
-    company: 'Google', title: '产品经理', companyType: '外企（中国大陆）', jobType: '产品项目',
+    company: 'Google', title: '产品经理', companyType: '外企（中国大陆）', jobType: '产品项目', source: 'catalog',
     platform: '公司官网', location: '上海'
   });
   assert.equal(item.companyType, '外企（中国大陆）');
   assert.equal(item.jobType, '产品项目');
   assert.equal(item.platform, '公司官网');
+  assert.equal(item.source, 'catalog');
 });
 
 test('dashboard summary reports active stages, responses and current-week additions', () => {

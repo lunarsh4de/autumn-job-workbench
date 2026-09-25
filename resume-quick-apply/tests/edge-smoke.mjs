@@ -163,8 +163,8 @@ try {
     throw new Error(`Catalog filter smoke test failed: ${JSON.stringify(filterValue)}`);
   }
   await client.send('Runtime.evaluate', { expression: `document.querySelector('#catalog-table [data-catalog-track]')?.click()` });
-  const trackedMetadata = await waitForEvaluation(client, `(() => { const card=document.querySelector('#kanban .job-card'); return !document.querySelector('#view-board').hidden && card ? {text:card.textContent, companyType:card.textContent.includes('外企（中国大陆）'), jobType:card.textContent.includes('数据算法'), platform:card.textContent.includes('公开清单')} : null; })()`);
-  if (!trackedMetadata.companyType || !trackedMetadata.jobType || !trackedMetadata.platform) throw new Error(`Catalog tracking metadata smoke test failed: ${JSON.stringify(trackedMetadata)}`);
+  const trackedMetadata = await waitForEvaluation(client, `(() => { const card=document.querySelector('#kanban .job-card'); return !document.querySelector('#view-board').hidden && card ? {text:card.textContent, companyType:card.textContent.includes('外企（中国大陆）'), jobType:card.textContent.includes('数据算法'), platform:card.textContent.includes('公开清单'), source:card.textContent.includes('岗位库')} : null; })()`);
+  if (!trackedMetadata.companyType || !trackedMetadata.jobType || !trackedMetadata.platform || !trackedMetadata.source) throw new Error(`Catalog tracking metadata smoke test failed: ${JSON.stringify(trackedMetadata)}`);
   await client.send('Runtime.evaluate', { expression: `globalThis.JobTrackerDashboard.showView('catalog')` });
   const resetCheck = await client.send('Runtime.evaluate', {
     expression: `(()=>{document.querySelector('#reset-catalog-filters').click();return {cityOptions:[...document.querySelector('#catalog-city').options].map(option=>option.textContent),result:document.querySelector('#catalog-result-count').textContent};})()`,

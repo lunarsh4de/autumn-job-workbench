@@ -432,7 +432,7 @@
     state.items = storedItems.map(value => CD.item(value)).filter(Boolean);
     if (storedItems.length && state.items.length) await DB.replaceAll(state.items);
     if (!state.items.length) {
-      const tracked = dashboard.getItems().map(job => ({ ...job, platform: job.source === 'extension' ? '投简历助手' : '手动记录', jobType: '校招', description: job.notes }));
+      const tracked = dashboard.getItems().map(job => ({ ...job, platform: job.source === 'extension' ? '投简历助手' : job.source === 'catalog' ? '岗位库' : '手动记录', jobType: '校招', description: job.notes }));
       const merged = CD.merge([], tracked);
       state.items = CD.rescore(merged.items, state.preferences);
       if (state.items.length) await DB.putMany(state.items);

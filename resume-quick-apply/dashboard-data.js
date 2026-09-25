@@ -68,7 +68,7 @@
       notes: text(value.notes, 10000),
       resumeProfileId: text(value.resumeProfileId, 80),
       resumeProfileLabel: text(value.resumeProfileLabel, 80),
-      source: value.source === 'extension' ? 'extension' : 'manual',
+      source: value.source === 'extension' || value.source === 'catalog' ? value.source : 'manual',
       createdAt,
       updatedAt
     };
