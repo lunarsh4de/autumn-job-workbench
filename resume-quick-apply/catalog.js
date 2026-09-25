@@ -15,6 +15,7 @@
   let catalogReady = false;
   let pendingResumeSync = false;
   let resumeSyncGeneration = 0;
+  let detailTrigger = null;
 
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -209,6 +210,16 @@
     track.disabled = tracked;
     track.setAttribute('aria-label', tracked ? '已在申请看板中' : '加入申请看板');
     dialog.showModal();
+    document.querySelector('#catalog-detail-close')?.focus();
+  }
+
+  function scheduleDetailFocusRestore() {
+    const trigger = detailTrigger;
+    detailTrigger = null;
+    if (!trigger) return;
+    setTimeout(() => {
+      if (trigger.isConnected && !document.querySelector('#view-catalog')?.hidden) trigger.focus();
+    }, 0);
   }
 
   async function importJobs() {
@@ -461,7 +472,10 @@
       state.visible = 200;
       renderTable();
     });
-    document.querySelector('#catalog-detail-close').addEventListener('click', () => document.querySelector('#catalog-detail-dialog').close());
+    document.querySelector('#catalog-detail-close').addEventListener('click', () => {
+      document.querySelector('#catalog-detail-dialog').close();
+      scheduleDetailFocusRestore();
+    });
     document.body.addEventListener('click', event => {
       const reset = event.target.closest('[data-reset-catalog]');
       if (reset) {
@@ -471,7 +485,10 @@
       const details = event.target.closest('[data-catalog-details]');
       if (details) {
         const job = state.items.find(item => item.id === details.dataset.catalogDetails);
-        if (job) openDetails(job);
+        if (job) {
+          detailTrigger = details;
+          openDetails(job);
+        }
         return;
       }
       const track = event.target.closest('[data-catalog-track]');
@@ -479,6 +496,9 @@
         const job = state.items.find(item => item.id === track.dataset.catalogTrack);
         if (job && !track.disabled) dashboard.addFromCatalog(job).then(() => { renderTable(); document.querySelector('#catalog-detail-dialog').open && document.querySelector('#catalog-detail-dialog').close(); }).catch(error => dashboard.flash(error.message, true));
       }
+    });
+    document.querySelector('#catalog-detail-dialog').addEventListener('close', () => {
+      scheduleDetailFocusRestore();
     });
   }
 

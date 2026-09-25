@@ -170,6 +170,12 @@ try {
     expression: `(()=>{const company=document.querySelector('#catalog-company');company.value='示例';company.dispatchEvent(new Event('input',{bubbles:true}));const search=document.querySelector('#catalog-search');search.value='外企（中国大陆）';search.dispatchEvent(new Event('input',{bubbles:true}));})()`
   });
   await waitForEvaluation(client, `document.querySelector('#catalog-result-count')?.textContent === '1 个岗位'`);
+  const detailFocus = await client.send('Runtime.evaluate', {
+    expression: `(async()=>{const trigger=document.querySelector('#catalog-table [data-catalog-details]');trigger?.click();const opened=document.querySelector('#catalog-detail-dialog')?.open && document.activeElement?.id==='catalog-detail-close';document.querySelector('#catalog-detail-close')?.click();await new Promise(resolve=>setTimeout(resolve,50));return {opened,restored:document.activeElement===trigger};})()`,
+    awaitPromise: true,
+    returnByValue: true
+  });
+  if (!detailFocus.result.value.opened || !detailFocus.result.value.restored) throw new Error(`Catalog detail focus smoke test failed: ${JSON.stringify(detailFocus.result.value)}`);
   await client.send('Runtime.evaluate', {
     expression: `(()=>{document.querySelector('#open-import').click();const input=document.querySelector('#catalog-paste');input.value='这不是有效岗位数据';document.querySelector('#import-form').requestSubmit();})()`
   });

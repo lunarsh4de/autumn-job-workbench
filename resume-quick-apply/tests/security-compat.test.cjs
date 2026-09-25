@@ -193,6 +193,14 @@ test('catalog tracking controls reflect existing application-board records', () 
   assert.match(catalog, /if \(job && !track\.disabled\)/);
 });
 
+test('catalog detail dialog restores focus to its triggering job control', () => {
+  const catalog = source('catalog.js');
+  assert.match(catalog, /let detailTrigger = null/);
+  assert.match(catalog, /catalog-detail-close.*focus\(\)/);
+  assert.match(catalog, /const trigger = detailTrigger/);
+  assert.match(catalog, /trigger\.focus\(\)/);
+});
+
 test('resume parsers are self-hosted with licenses and no remote script tags', () => {
   const path = require('node:path');
   const root = path.join(__dirname, '..', 'vendor');
