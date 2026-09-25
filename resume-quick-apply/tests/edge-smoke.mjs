@@ -129,7 +129,7 @@ try {
   const publicStatus = await waitForEvaluation(client, `(() => { const node=document.querySelector('#public-sync-status'); return node && node.dataset.state !== 'loading' ? {state:node.dataset.state,text:node.textContent} : null; })()`);
   if (!publicStatus || /Failed to fetch|NetworkError|Load failed/i.test(publicStatus.text)) throw new Error(`Public source status smoke test failed: ${JSON.stringify(publicStatus)}`);
   await client.send('Runtime.evaluate', {
-    expression: `(()=>{document.querySelector('#open-import').click();const input=document.querySelector('#catalog-paste');input.value='公司,岗位,地点,链接,平台,标签\\n示例科技,数据分析师,上海,https://jobs.example.test/imported,公开清单,"SQL,Python"';input.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#import-form').requestSubmit();})()`
+      expression: `(()=>{document.querySelector('#open-import').click();const input=document.querySelector('#catalog-paste');input.value='公司,岗位,地点,链接,平台,标签,企业类型,岗位类型\\n示例科技,数据分析师,上海,https://jobs.example.test/imported,公开清单,"SQL,Python",外企（中国大陆）,数据算法';input.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#import-form').requestSubmit();})()`
   });
   await waitForEvaluation(client, `document.querySelector('#catalog-total').textContent==='5' && /导入完成/.test(document.querySelector('#import-result').textContent)`);
   const catalogFilters = await client.send('Runtime.evaluate', {
@@ -151,6 +151,10 @@ try {
   if (!filterValue.companyInput || filterValue.hasAllCompanySelect || !filterValue.cityOptions.includes('上海') || filterValue.result !== '1 个岗位') {
     throw new Error(`Catalog filter smoke test failed: ${JSON.stringify(filterValue)}`);
   }
+  await client.send('Runtime.evaluate', { expression: `document.querySelector('#catalog-table [data-catalog-track]')?.click()` });
+  const trackedMetadata = await waitForEvaluation(client, `(() => { const card=document.querySelector('#kanban .job-card'); return !document.querySelector('#view-board').hidden && card ? {text:card.textContent, companyType:card.textContent.includes('外企（中国大陆）'), jobType:card.textContent.includes('数据算法'), platform:card.textContent.includes('公开清单')} : null; })()`);
+  if (!trackedMetadata.companyType || !trackedMetadata.jobType || !trackedMetadata.platform) throw new Error(`Catalog tracking metadata smoke test failed: ${JSON.stringify(trackedMetadata)}`);
+  await client.send('Runtime.evaluate', { expression: `globalThis.JobTrackerDashboard.showView('catalog')` });
   await client.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
   await wait(250);
   const dashboard = await client.send('Runtime.evaluate', {

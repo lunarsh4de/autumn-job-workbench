@@ -115,7 +115,7 @@
 
   function itemMatches(entry) {
     if (!state.query) return true;
-    const haystack = [entry.title, entry.company, entry.location, entry.notes, stageById[entry.stage]?.label].join(' ').toLowerCase();
+    const haystack = [entry.title, entry.company, entry.location, entry.companyType, entry.jobType, entry.platform, entry.notes, stageById[entry.stage]?.label].join(' ').toLowerCase();
     return haystack.includes(state.query);
   }
 
@@ -310,6 +310,9 @@
       meta.append(location);
     }
     if (entry.salary) meta.append(element('span', '', entry.salary));
+    if (entry.companyType) meta.append(element('span', '', entry.companyType));
+    if (entry.jobType) meta.append(element('span', '', entry.jobType));
+    if (entry.platform) meta.append(element('span', '', entry.platform));
     meta.append(element('span', '', entry.source === 'extension' ? '插件同步' : '手动添加'));
     if (entry.resumeProfileLabel) meta.append(element('span', '', `简历：${entry.resumeProfileLabel}`));
     card.append(meta);
@@ -341,7 +344,8 @@
       const row = document.createElement('tr');
       const identity = document.createElement('td');
       const copy = element('div', 'table-job');
-      copy.append(element('strong', '', entry.title), element('span', '', `${entry.company}${entry.resumeProfileLabel ? ` · 简历：${entry.resumeProfileLabel}` : ''}`));
+      const labels = [entry.company, entry.companyType, entry.jobType, entry.resumeProfileLabel ? `简历：${entry.resumeProfileLabel}` : ''].filter(Boolean);
+      copy.append(element('strong', '', entry.title), element('span', '', labels.join(' · ')));
       identity.append(copy);
       const stage = document.createElement('td');
       stage.append(stageBadge(entry.stage));
@@ -519,6 +523,9 @@
       url: job.url,
       deadline: job.deadline,
       notes: job.description,
+      companyType: job.companyType,
+      jobType: job.jobType,
+      platform: job.platform,
       stage: 'watch',
       priority: Number.isFinite(job.matchScore) && job.matchScore >= 70 ? 'high' : 'normal',
       source: 'manual',
@@ -537,8 +544,8 @@
   }
 
   function exportJobs() {
-    const rows = [['公司', '岗位', '阶段', '优先级', '地点', '薪资', '截止日期', '下一步时间', '面试时间', '使用简历档案', '链接', '备注'], ...state.items.map(entry => [
-      entry.company, entry.title, stageById[entry.stage]?.label || '', entry.priority, entry.location, entry.salary, entry.deadline,
+    const rows = [['公司', '岗位', '企业类型', '岗位分类', '来源平台', '阶段', '优先级', '地点', '薪资', '截止日期', '下一步时间', '面试时间', '使用简历档案', '链接', '备注'], ...state.items.map(entry => [
+      entry.company, entry.title, entry.companyType, entry.jobType, entry.platform, stageById[entry.stage]?.label || '', entry.priority, entry.location, entry.salary, entry.deadline,
       entry.nextActionAt, entry.interviewAt, entry.resumeProfileLabel, entry.url, entry.notes
     ])];
     if (rows.length === 1) return flash('还没有可导出的岗位。', true);
