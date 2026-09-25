@@ -129,6 +129,10 @@ test('GitHub sync preserves refreshed token metadata and reports backup freshnes
   assert.match(sync, /正在保存 GitHub 私有备份/);
   assert.match(sync, /正在读取 GitHub 私有备份/);
   assert.match(sync, /等待 GitHub 授权确认/);
+  assert.match(sync, /authCancelled = false/);
+  assert.match(sync, /GitHub 授权已取消/);
+  assert.match(sync, /当前设备与私有 Gist 的绑定已解除/);
+  assert.match(source('dashboard.html'), /id="github-cancel"/);
 });
 
 test('dashboard exposes a disabled button affordance and keeps profile toasts out of backup actions', () => {

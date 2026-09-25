@@ -15,9 +15,11 @@
   const signIn = document.querySelector('#github-sign-in');
   const save = document.querySelector('#github-save-backup');
   const restore = document.querySelector('#github-restore-backup');
+  const cancel = document.querySelector('#github-cancel');
   const signOut = document.querySelector('#github-sign-out');
   const extensionAvailable = Boolean(globalThis.chrome?.runtime?.id);
   let token = '';
+  let authCancelled = false;
 
   function updateProfileUi(login = '') {
     const label = document.querySelector('#profile-entry-label');
@@ -81,6 +83,7 @@
   }
 
   async function deviceLogin() {
+    authCancelled = false;
     const response = await fetch('https://github.com/login/device/code', {
       method: 'POST',
       headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -94,12 +97,14 @@
     const deadline = Date.now() + Math.min(15 * 60 * 1000, Number(device.expires_in || 900) * 1000);
     while (Date.now() < deadline) {
       await new Promise(resolve => setTimeout(resolve, interval));
+      if (authCancelled) throw new Error('GitHub 授权已取消。');
       const poll = await fetch('https://github.com/login/oauth/access_token', {
         method: 'POST',
         headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ client_id: CLIENT_ID, device_code: device.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' })
       });
       const result = await poll.json();
+      if (authCancelled) throw new Error('GitHub 授权已取消。');
       if (result.access_token) return { token: result.access_token, refreshToken: result.refresh_token || '', expiresAt: result.expires_in ? Date.now() + Number(result.expires_in) * 1000 : 0 };
       if (result.error === 'slow_down') interval += 5000;
       else if (!['authorization_pending'].includes(result.error)) throw new Error(result.error_description || 'GitHub 授权未完成。');
@@ -126,6 +131,7 @@
   async function connect() {
     signIn.disabled = true;
     signIn.setAttribute('aria-busy', 'true');
+    if (cancel) cancel.hidden = false;
     setStatus('正在连接 GitHub…', false, false, true);
     try {
       if (!globalThis.chrome?.runtime?.id) throw new Error('GitHub 授权需要从已安装的投简历助手工作台打开。');
@@ -143,6 +149,7 @@
     } finally {
       signIn.disabled = false;
       signIn.setAttribute('aria-busy', 'false');
+      if (cancel) cancel.hidden = true;
       status.setAttribute('aria-busy', 'false');
     }
   }
@@ -184,7 +191,7 @@
     token = '';
     await storage.set({ githubGistToken: null, githubGistRefreshToken: null, githubGistExpiresAt: null, githubUserLogin: null, githubGistId: null, githubBackupAt: null });
     setConnectedUi('');
-    setStatus('已退出 GitHub，本地数据未删除。');
+    setStatus('已退出 GitHub；本地数据未删除，当前设备与私有 Gist 的绑定已解除。');
   }
 
   async function readBackupFile() {
@@ -230,6 +237,10 @@
   }
 
   signIn.addEventListener('click', () => connect());
+  cancel?.addEventListener('click', () => {
+    authCancelled = true;
+    setStatus('正在取消 GitHub 授权…', false, false, true);
+  });
   save.addEventListener('click', () => saveBackup());
   restore?.addEventListener('click', () => restoreBackup());
   signOut.addEventListener('click', () => disconnect());
