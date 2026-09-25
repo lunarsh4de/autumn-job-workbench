@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import html
 import io
 import json
 import re
@@ -35,12 +36,18 @@ CITY_PROVINCES = {
     "北京": "北京", "上海": "上海", "天津": "天津", "重庆": "重庆", "广州": "广东", "深圳": "广东", "珠海": "广东", "佛山": "广东", "东莞": "广东", "杭州": "浙江", "宁波": "浙江", "温州": "浙江", "南京": "江苏", "苏州": "江苏", "无锡": "江苏", "成都": "四川", "绵阳": "四川", "武汉": "湖北", "长沙": "湖南", "郑州": "河南", "西安": "陕西", "合肥": "安徽", "福州": "福建", "厦门": "福建", "济南": "山东", "青岛": "山东", "沈阳": "辽宁", "大连": "辽宁", "哈尔滨": "黑龙江", "长春": "吉林", "南昌": "江西", "昆明": "云南", "贵阳": "贵州", "太原": "山西", "石家庄": "河北", "乌鲁木齐": "新疆", "兰州": "甘肃", "海口": "海南", "南宁": "广西", "呼和浩特": "内蒙古", "拉萨": "西藏", "银川": "宁夏", "西宁": "青海", "香港": "香港", "澳门": "澳门", "台北": "台湾"
 }
 PROVINCES = tuple({"北京", "上海", "天津", "重庆", "广东", "浙江", "江苏", "四川", "湖北", "湖南", "河南", "陕西", "安徽", "福建", "山东", "辽宁", "黑龙江", "吉林", "江西", "云南", "贵州", "山西", "河北", "新疆", "甘肃", "海南", "广西", "内蒙古", "西藏", "宁夏", "青海", "香港", "澳门", "台湾"})
+FOREIGN_COMPANY_PATTERN = re.compile(r"微软|英特尔|英伟达|苹果|亚马逊|谷歌|Google|Microsoft|Amazon|Apple|IBM|SAP|西门子|博世(?:（中国|中国)|联合利华|宝洁|欧莱雅|耐克|阿迪达斯|德勤|普华永道|安永|毕马威|埃森哲|汇丰|渣打|花旗|摩根|可口可乐|百事|星巴克|麦肯锡|波士顿咨询|贝恩|Airbnb|Stripe|Datadog|Cloudflare|Coinbase", re.I)
+MAINLAND_LOCATION_PATTERN = re.compile(r"北京|上海|天津|重庆|广州|深圳|杭州|宁波|南京|苏州|无锡|成都|武汉|长沙|郑州|西安|合肥|福州|厦门|济南|青岛|沈阳|大连|哈尔滨|长春|南昌|昆明|贵阳|太原|石家庄|乌鲁木齐|兰州|海口|南宁|呼和浩特|拉萨|银川|西宁|中国大陆|中国内地|Mainland China|China(?:\s|[-,]|$)", re.I)
 
 
 def clean(value: Any, limit: int = 12000) -> str:
     if value is None:
         return ""
     return str(value).strip()[:limit]
+
+
+def plain_html(value: Any, limit: int = 12000) -> str:
+    return re.sub(r"<[^>]+>", " ", html.unescape(clean(value, limit)))
 
 
 def classify_job_type(job: dict[str, Any]) -> str:
@@ -68,6 +75,13 @@ def region_parts(job: dict[str, Any]) -> tuple[str, str]:
         match = re.search(r"([^\s-]{2,8}?)(?:市|区|县)", raw)
         city = match.group(1) if match else (province if province in {"北京", "上海", "天津", "重庆"} else "未标注")
     return province, city
+
+
+def is_mainland_location(value: Any) -> bool:
+    location = clean(value, 160)
+    if not location or re.search(r"香港|澳门|Hong Kong|Macau|海外|海外地区", location, re.I):
+        return False
+    return bool(MAINLAND_LOCATION_PATTERN.search(location))
 
 
 def get_json(url: str, max_bytes: int) -> Any:
@@ -103,6 +117,13 @@ def normalize(job: dict[str, Any], source: dict[str, Any]) -> dict[str, Any] | N
     if isinstance(tags, str):
         tags = [part.strip() for part in tags.replace("，", ",").split(",") if part.strip()]
     province, city = region_parts(job)
+    explicit_company_type = clean(job.get("companyType"), 40) or clean(source.get("companyType"), 40)
+    if explicit_company_type and re.search(r"外企|外资|跨国|foreign|mnc", explicit_company_type, re.I):
+        company_type = "外企（中国大陆）" if source.get("mainland_china_only") or is_mainland_location(job.get("location")) else "国内/综合"
+    elif explicit_company_type:
+        company_type = explicit_company_type
+    else:
+        company_type = "外企（中国大陆）" if FOREIGN_COMPANY_PATTERN.search(company) and is_mainland_location(job.get("location")) else "国内/综合"
     return {
         "id": f"public-{digest}",
         "company": company,
@@ -119,6 +140,7 @@ def normalize(job: dict[str, Any], source: dict[str, Any]) -> dict[str, Any] | N
         "deadline": clean(job.get("deadline"), 30),
         "sourceId": source["id"],
         "sourceAttribution": source.get("attribution", source["url"]),
+        "companyType": company_type,
     }
 
 
@@ -170,6 +192,33 @@ def adapt_standard(payload: Any) -> list[dict[str, Any]]:
     if isinstance(payload, dict) and isinstance(payload.get("jobs"), list):
         return [row for row in payload["jobs"] if isinstance(row, dict)]
     return []
+
+
+def adapt_greenhouse(payload: Any, source: dict[str, Any]) -> list[dict[str, Any]]:
+    rows = payload.get("jobs", []) if isinstance(payload, dict) else []
+    company = clean(source.get("company"), 160) or clean(source.get("name"), 160)
+    result = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        location = row.get("location") or {}
+        location_name = location.get("name") if isinstance(location, dict) else location
+        if source.get("mainland_china_only") and not is_mainland_location(location_name):
+            continue
+        result.append({
+            "company": row.get("company_name") or company,
+            "title": row.get("title"),
+            "location": location_name,
+            "url": row.get("absolute_url"),
+            "platform": f"{company} 官方招聘",
+            "jobType": row.get("title"),
+            "tags": ["外企", company, clean(row.get("language"), 40)],
+            "description": plain_html(row.get("content")),
+            "publishedAt": row.get("first_published") or row.get("updated_at"),
+            "deadline": row.get("application_deadline"),
+            "companyType": "外企",
+        })
+    return result
 
 
 def adapt_csv(text: str) -> list[dict[str, Any]]:
@@ -242,6 +291,7 @@ def collect(source: dict[str, Any]) -> list[dict[str, Any]]:
             "jobhunter1-json": adapt_jobhunter,
             "new-grad-positions-json": adapt_new_grad,
             "standard-json": adapt_standard,
+            "greenhouse-json": lambda payload: adapt_greenhouse(payload, source),
         }
         if source_type not in adapters:
             raise ValueError(f"unsupported source type: {source_type}")

@@ -51,3 +51,16 @@ test('catalog falls back to a bounded category for unknown new roles', () => {
   assert.equal(job.province, '上海');
   assert.equal(job.city, '上海');
 });
+
+test('catalog normalizes mainland foreign-company labels and derives resume preferences', () => {
+  const job = C.item({ company: 'Airbnb', title: '产品经理', location: '上海', companyType: '外企' });
+  assert.equal(job.companyType, '外企（中国大陆）');
+  const automatic = C.deriveResumePreferences({
+    profile: { city: '深圳', skills: 'SQL, Python' },
+    experiences: { work: [{ role: '产品经理', location: '上海' }], projects: [{ role: '用户研究', location: '' }] }
+  });
+  assert.deepEqual(automatic, { roles: '产品经理, 用户研究', skills: 'SQL, Python', cities: '上海, 深圳' });
+  assert.deepEqual(C.mergePreferences({ roles: '数据分析', skills: '', cities: '北京' }, automatic), {
+    roles: '数据分析, 产品经理, 用户研究', skills: 'SQL, Python', cities: '北京, 上海, 深圳'
+  });
+});

@@ -49,7 +49,7 @@
             <div><h2>本地岗位库</h2><p>批量导入公开岗位，在浏览器内筛选、匹配，再加入申请看板。</p></div>
             <div class="catalog-actions"><button class="button secondary" type="button" id="rescore-catalog"><img src="icons/refresh-cw.svg" alt="" />重新评分</button><button class="button primary" type="button" id="open-import"><img src="icons/file-up.svg" alt="" />导入岗位</button></div>
           </div>
-          <div class="source-banner"><img src="icons/database.svg" alt="" /><p><strong>数据来源</strong> <span id="public-sync-status">正在检查公共岗位源...</span>；岗位存入 IndexedDB，不会上传个人筛选和投递记录。</p><button class="text-link" id="sync-public-catalog" type="button">立即同步</button><button class="text-link" type="button" data-go-view="sources">查看来源</button></div>
+          <div class="source-banner"><img src="icons/database.svg" alt="" /><p><strong>数据来源</strong> <span id="public-sync-status">正在检查公共岗位源...</span>；岗位存入 IndexedDB，不会上传个人筛选和投递记录。<span class="resume-sync-status" id="resume-sync-status">尚未检测到插件简历</span></p><button class="text-link" id="sync-public-catalog" type="button">立即同步</button><button class="text-link" type="button" data-go-view="sources">查看来源</button></div>
           <div class="metric-grid catalog-metrics" aria-label="岗位库数据">
             <article class="metric-card"><div class="metric-label"><span>岗位总数</span><span class="metric-icon blue"><img src="icons/briefcase-business.svg" alt="" /></span></div><strong id="catalog-total">0</strong><small>当前浏览器本地岗位</small></article>
             <article class="metric-card"><div class="metric-label"><span>覆盖公司</span><span class="metric-icon violet"><img src="icons/building-2.svg" alt="" /></span></div><strong id="catalog-companies">0</strong><small>按标准化公司名统计</small></article>
@@ -65,6 +65,7 @@
               <select id="catalog-province" aria-label="按省份筛选"><option value="all">全部省份</option></select>
               <select id="catalog-city" aria-label="按城市筛选"><option value="all">全部城市</option></select>
               <select id="catalog-type" aria-label="筛选岗位类型"><option value="all">全部岗位类型</option></select>
+              <select id="catalog-company-type" aria-label="筛选企业类型"><option value="all">全部企业类型</option></select>
               <select id="catalog-platform" aria-label="筛选平台"><option value="all">全部平台</option></select>
               <select id="catalog-score" aria-label="筛选匹配分"><option value="all">不限分数</option><option value="high">70 分以上</option><option value="medium">40–69 分</option><option value="low">低于 40 分</option></select>
               <select id="catalog-sort" aria-label="岗位排序"><option value="match">匹配度优先</option><option value="latest">最近导入</option><option value="company">公司名称</option></select>
@@ -150,6 +151,9 @@
             <article class="source-card"><span class="source-kind">校招社区</span><h3>牛客校招</h3><p>校招岗位、公司日程、笔面试经验与讨论。</p><a class="button secondary" href="https://www.nowcoder.com/jobs/school" target="_blank" rel="noopener noreferrer">打开来源 <img src="icons/external-link.svg" alt="" /></a></article>
             <article class="source-card"><span class="source-kind">综合校招</span><h3>应届生求职网</h3><p>按城市、行业和公司聚合校园招聘信息。</p><a class="button secondary" href="https://www.yingjiesheng.com/" target="_blank" rel="noopener noreferrer">打开来源 <img src="icons/external-link.svg" alt="" /></a></article>
             <article class="source-card"><span class="source-kind">实习转正</span><h3>实习僧</h3><p>日常实习、暑期实习和可转正岗位。</p><a class="button secondary" href="https://www.shixiseng.com/" target="_blank" rel="noopener noreferrer">打开来源 <img src="icons/external-link.svg" alt="" /></a></article>
+            <article class="source-card foreign-source"><span class="source-kind">外企（中国大陆）</span><h3>中国大陆外企岗位</h3><p>自动源只保留北京、上海、深圳、杭州等中国大陆地点；香港、新加坡和海外岗位会被排除。</p><a class="button secondary" href="https://github.com/lunarsh4de/autumn-job-workbench/blob/main/job-sources/sources.json" target="_blank" rel="noopener noreferrer">查看自动源 <img src="icons/external-link.svg" alt="" /></a></article>
+            <article class="source-card"><span class="source-kind">外企官网</span><h3>英特尔中国招聘</h3><p>用于补充官方岗位浏览；发现岗位后可通过插件投递并同步到工作台。</p><a class="button secondary" href="https://jobs.intel.com/en/search-jobs/China" target="_blank" rel="noopener noreferrer">打开来源 <img src="icons/external-link.svg" alt="" /></a></article>
+            <article class="source-card"><span class="source-kind">外企官网</span><h3>汇丰中国招聘</h3><p>中国大陆岗位以官方页面为准，工作台不会绕过登录或验证码。</p><a class="button secondary" href="https://mycareer.hsbc.com/zh_CN/external/SearchJobs" target="_blank" rel="noopener noreferrer">打开来源 <img src="icons/external-link.svg" alt="" /></a></article>
             <article class="source-card"><span class="source-kind">开源清单</span><h3>GitHub 校招项目</h3><p>适合导入结构化公开清单；使用前检查更新时间和许可证。</p><a class="button secondary" href="https://github.com/search?q=%E6%A0%A1%E6%8B%9B+jobs&type=repositories" target="_blank" rel="noopener noreferrer">搜索项目 <img src="icons/external-link.svg" alt="" /></a></article>
           </div>
         </section>

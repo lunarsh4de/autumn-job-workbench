@@ -8,6 +8,7 @@
     city: ['city', '城市', '市'],
     url: ['url', 'link', '链接', '投递链接', '岗位链接'],
     platform: ['platform', 'source', '平台', '来源', '招聘平台'],
+    companyType: ['companytype', 'company_type', '企业类型', '公司类型'],
     jobType: ['jobtype', 'type', '岗位类型', '职位类型', '类别'],
     tags: ['tags', 'keywords', '标签', '关键词'],
     description: ['description', 'jd', '岗位描述', '职位描述', '描述'],
@@ -33,6 +34,7 @@
     北京: '北京', 上海: '上海', 天津: '天津', 重庆: '重庆', 广州: '广东', 深圳: '广东', 珠海: '广东', 佛山: '广东', 东莞: '广东', 杭州: '浙江', 宁波: '浙江', 温州: '浙江', 南京: '江苏', 苏州: '江苏', 无锡: '江苏', 成都: '四川', 绵阳: '四川', 武汉: '湖北', 长沙: '湖南', 郑州: '河南', 西安: '陕西', 合肥: '安徽', 福州: '福建', 厦门: '福建', 济南: '山东', 青岛: '山东', 沈阳: '辽宁', 大连: '辽宁', 哈尔滨: '黑龙江', 长春: '吉林', 南昌: '江西', 昆明: '云南', 贵阳: '贵州', 太原: '山西', 石家庄: '河北', 乌鲁木齐: '新疆', 兰州: '甘肃', 海口: '海南', 南宁: '广西', 呼和浩特: '内蒙古', 拉萨: '西藏', 银川: '宁夏', 西宁: '青海', 香港: '香港', 澳门: '澳门', 台北: '台湾'
   };
   const PROVINCES = ['北京', '上海', '天津', '重庆', '广东', '浙江', '江苏', '四川', '湖北', '湖南', '河南', '陕西', '安徽', '福建', '山东', '辽宁', '黑龙江', '吉林', '江西', '云南', '贵州', '山西', '河北', '新疆', '甘肃', '海南', '广西', '内蒙古', '西藏', '宁夏', '青海', '香港', '澳门', '台湾'];
+  const FOREIGN_COMPANY_TYPES = new Set(['外企', '外资', '跨国公司', 'foreign', 'foreign company', 'mnc']);
 
   function text(value, max = 2000) {
     return typeof value === 'string' || typeof value === 'number' ? String(value).trim().slice(0, max) : '';
@@ -90,6 +92,13 @@
     }));
   }
 
+  function normalizeCompanyType(value, company = '') {
+    const explicit = text(value, 80).toLowerCase();
+    if (FOREIGN_COMPANY_TYPES.has(explicit) || explicit.includes('外企') || explicit.includes('外资')) return '外企（中国大陆）';
+    if (explicit.includes('国企') || explicit.includes('央企')) return '国内/综合';
+    return text(value, 80) || '国内/综合';
+  }
+
   function item(value, now = Date.now()) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     const row = canonicalRow(value);
@@ -113,6 +122,7 @@
       location,
       url,
       platform,
+      companyType: normalizeCompanyType(row.companyType || value.companyType, company),
       province: region.province,
       city: region.city,
       jobType: classifyJobType({ ...value, ...row, title, tags, description: row.description || value.description }),
@@ -220,6 +230,37 @@
     return (values || []).map(value => ({ ...value, matchScore: score(value, preferences), scoredAt: now }));
   }
 
+  function deriveResumePreferences(saved = {}) {
+    const profile = saved.profile && typeof saved.profile === 'object' ? saved.profile : {};
+    const experiences = saved.experiences && typeof saved.experiences === 'object' ? saved.experiences : {};
+    const roles = [];
+    const cities = [];
+    const add = (list, value) => {
+      const normalized = text(value, 120).replace(/[，,;；|/\\]+/g, ' ').trim();
+      if (normalized && !list.includes(normalized)) list.push(normalized);
+    };
+    for (const group of ['work', 'projects']) {
+      for (const entry of Array.isArray(experiences[group]) ? experiences[group] : []) {
+        add(roles, entry?.role);
+        add(cities, entry?.location);
+      }
+    }
+    add(cities, profile.city);
+    return {
+      roles: roles.join(', '),
+      skills: text(profile.skills, 3000),
+      cities: cities.join(', ')
+    };
+  }
+
+  function mergePreferences(manual = {}, automatic = {}) {
+    return {
+      roles: [manual.roles, automatic.roles].filter(Boolean).join(', '),
+      skills: [manual.skills, automatic.skills].filter(Boolean).join(', '),
+      cities: [manual.cities, automatic.cities].filter(Boolean).join(', ')
+    };
+  }
+
   function summary(values) {
     const jobs = values || [];
     return {
@@ -230,7 +271,7 @@
     };
   }
 
-  const api = { item, parseCsv, parseImport, merge, score, rescore, summary, classifyJobType, regionParts, formatRegion };
+  const api = { item, parseCsv, parseImport, merge, score, rescore, summary, classifyJobType, regionParts, formatRegion, deriveResumePreferences, mergePreferences, normalizeCompanyType };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else globalThis.CatalogData = api;
 })();

@@ -26,6 +26,66 @@
       "attribution": "https://github.com/OWNER/REPOSITORY",
       "enabled": false,
       "max_bytes": 5242880
+    },
+    {
+      "id": "stripe-greenhouse",
+      "name": "Stripe 外企岗位（Greenhouse）",
+      "type": "greenhouse-json",
+      "url": "https://boards-api.greenhouse.io/v1/boards/stripe/jobs?content=true",
+      "attribution": "https://stripe.com/jobs",
+      "company": "Stripe",
+      "companyType": "外企",
+      "enabled": true,
+      "mainland_china_only": true,
+      "max_bytes": 12582912
+    },
+    {
+      "id": "datadog-greenhouse",
+      "name": "Datadog 外企岗位（Greenhouse）",
+      "type": "greenhouse-json",
+      "url": "https://boards-api.greenhouse.io/v1/boards/datadog/jobs?content=true",
+      "attribution": "https://careers.datadoghq.com/",
+      "company": "Datadog",
+      "companyType": "外企",
+      "enabled": false,
+      "mainland_china_only": true,
+      "max_bytes": 12582912
+    },
+    {
+      "id": "airbnb-greenhouse",
+      "name": "Airbnb 外企岗位（Greenhouse）",
+      "type": "greenhouse-json",
+      "url": "https://boards-api.greenhouse.io/v1/boards/airbnb/jobs?content=true",
+      "attribution": "https://careers.airbnb.com/",
+      "company": "Airbnb",
+      "companyType": "外企",
+      "enabled": true,
+      "mainland_china_only": true,
+      "max_bytes": 8388608
+    },
+    {
+      "id": "cloudflare-greenhouse",
+      "name": "Cloudflare 外企岗位（Greenhouse）",
+      "type": "greenhouse-json",
+      "url": "https://boards-api.greenhouse.io/v1/boards/cloudflare/jobs?content=true",
+      "attribution": "https://www.cloudflare.com/careers/",
+      "company": "Cloudflare",
+      "companyType": "外企",
+      "enabled": false,
+      "mainland_china_only": true,
+      "max_bytes": 12582912
+    },
+    {
+      "id": "coinbase-greenhouse",
+      "name": "Coinbase 外企岗位（Greenhouse）",
+      "type": "greenhouse-json",
+      "url": "https://boards-api.greenhouse.io/v1/boards/coinbase/jobs?content=true",
+      "attribution": "https://www.coinbase.com/careers",
+      "company": "Coinbase",
+      "companyType": "外企",
+      "enabled": false,
+      "mainland_china_only": true,
+      "max_bytes": 8388608
     }
   ]
 }

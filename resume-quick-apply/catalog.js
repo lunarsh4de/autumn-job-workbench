@@ -4,8 +4,10 @@
   const dashboard = globalThis.JobTrackerDashboard;
   const state = {
     items: [],
+    manualPreferences: { roles: '', skills: '', cities: '' },
+    autoPreferences: { roles: '', skills: '', cities: '' },
     preferences: { roles: '', skills: '', cities: '' },
-    query: '', companyQuery: '', province: 'all', city: 'all', jobType: 'all', platform: 'all', score: 'all', sort: 'match', visible: 200
+    query: '', companyQuery: '', province: 'all', city: 'all', jobType: 'all', companyType: 'all', platform: 'all', score: 'all', sort: 'match', visible: 200
   };
 
   function element(tag, className, text) {
@@ -41,6 +43,7 @@
       if (state.province !== 'all' && job.province !== state.province) return false;
       if (state.city !== 'all' && job.city !== state.city) return false;
       if (state.jobType !== 'all' && job.jobType !== state.jobType) return false;
+      if (state.companyType !== 'all' && job.companyType !== state.companyType) return false;
       if (state.platform !== 'all' && job.platform !== state.platform) return false;
       if (state.score === 'high' && !(job.matchScore >= 70)) return false;
       if (state.score === 'medium' && !(job.matchScore >= 40 && job.matchScore < 70)) return false;
@@ -81,6 +84,7 @@
     state.province = setOptions('#catalog-province', state.items.map(job => job.province), '省份');
     state.city = setOptions('#catalog-city', state.items.filter(job => state.province === 'all' || job.province === state.province).map(job => job.city), '城市');
     state.jobType = setOptions('#catalog-type', state.items.map(job => job.jobType), '岗位类型');
+    state.companyType = setOptions('#catalog-company-type', state.items.map(job => job.companyType), '企业类型');
     state.platform = setOptions('#catalog-platform', state.items.map(job => job.platform), '平台');
     renderMatchStrip();
     renderTable();
@@ -118,6 +122,7 @@
     for (const job of list.slice(0, state.visible)) {
       const row = document.createElement('tr');
       const company = element('td', 'catalog-company-cell', job.company);
+      if (job.companyType === '外企（中国大陆）') company.append(element('span', 'company-type-badge', '外企（中国大陆）'));
       const titleCell = document.createElement('td');
       const copy = element('div', 'catalog-job-copy');
       copy.append(element('strong', '', job.title));
@@ -211,8 +216,9 @@
 
   async function savePreferences() {
     const form = document.querySelector('#preference-form');
-    state.preferences = Object.fromEntries(new FormData(form));
-    await dashboard.storage.set({ jobSearchPreferences: state.preferences });
+    state.manualPreferences = Object.fromEntries(new FormData(form));
+    state.preferences = CD.mergePreferences(state.manualPreferences, state.autoPreferences);
+    await dashboard.storage.set({ jobSearchPreferences: state.manualPreferences });
     state.items = CD.rescore(state.items, state.preferences);
     await DB.replaceAll(state.items);
     render();
@@ -281,7 +287,7 @@
   function resetFilters() {
     state.query = '';
     state.companyQuery = '';
-    state.province = state.city = state.jobType = state.platform = state.score = 'all';
+    state.province = state.city = state.jobType = state.companyType = state.platform = state.score = 'all';
     state.sort = 'match';
     state.visible = 200;
     document.querySelector('#catalog-search').value = '';
@@ -289,6 +295,7 @@
     document.querySelector('#catalog-province').value = 'all';
     document.querySelector('#catalog-city').value = 'all';
     document.querySelector('#catalog-type').value = 'all';
+    document.querySelector('#catalog-company-type').value = 'all';
     document.querySelector('#catalog-platform').value = 'all';
     document.querySelector('#catalog-score').value = 'all';
     document.querySelector('#catalog-sort').value = 'match';
@@ -321,7 +328,7 @@
     document.querySelector('#sync-public-catalog').addEventListener('click', () => syncPublicFeed(true));
     document.querySelector('#catalog-search').addEventListener('input', event => { state.query = event.target.value.trim(); state.visible = 200; renderTable(); });
     document.querySelector('#catalog-company').addEventListener('input', event => { state.companyQuery = event.target.value.trim(); state.visible = 200; renderTable(); });
-    for (const [selector, key] of [['#catalog-province', 'province'], ['#catalog-city', 'city'], ['#catalog-type', 'jobType'], ['#catalog-platform', 'platform'], ['#catalog-score', 'score'], ['#catalog-sort', 'sort']]) {
+    for (const [selector, key] of [['#catalog-province', 'province'], ['#catalog-city', 'city'], ['#catalog-type', 'jobType'], ['#catalog-company-type', 'companyType'], ['#catalog-platform', 'platform'], ['#catalog-score', 'score'], ['#catalog-sort', 'sort']]) {
       document.querySelector(selector).addEventListener('change', event => {
         state[key] = event.target.value;
         if (key === 'province') state.city = 'all';
@@ -354,10 +361,15 @@
   }
 
   async function load() {
-    const saved = await dashboard.storage.get(['jobSearchPreferences']);
-    state.preferences = { ...state.preferences, ...(saved.jobSearchPreferences || {}) };
+    const saved = await dashboard.storage.get(['jobSearchPreferences', 'resumeAutoPreferences', 'resumeProfiles', 'activeProfileId', 'activeProfileLabel', 'profile', 'experiences']);
+    state.manualPreferences = { ...state.manualPreferences, ...(saved.jobSearchPreferences || {}) };
+    const storedAutomatic = saved.resumeAutoPreferences && Object.values(saved.resumeAutoPreferences).some(Boolean)
+      ? saved.resumeAutoPreferences : CD.deriveResumePreferences(saved);
+    state.autoPreferences = { ...state.autoPreferences, ...storedAutomatic };
+    state.preferences = CD.mergePreferences(state.manualPreferences, state.autoPreferences);
     const form = document.querySelector('#preference-form');
-    for (const [key, value] of Object.entries(state.preferences)) form.elements.namedItem(key).value = value;
+    for (const [key, value] of Object.entries(state.manualPreferences)) form.elements.namedItem(key).value = value;
+    dashboard.setResumeSyncStatus?.(saved);
     const storedItems = await DB.getAll();
     state.items = storedItems.map(value => CD.item(value)).filter(Boolean);
     if (storedItems.length && state.items.length) await DB.replaceAll(state.items);
@@ -371,6 +383,28 @@
     await syncPublicFeed(false);
   }
 
+  async function syncResumeProfile(saved, announce = true) {
+    const automatic = CD.deriveResumePreferences(saved);
+    state.autoPreferences = automatic;
+    state.preferences = CD.mergePreferences(state.manualPreferences, automatic);
+    await dashboard.storage.set({ resumeAutoPreferences: automatic });
+    state.items = CD.rescore(state.items, state.preferences);
+    await DB.replaceAll(state.items);
+    dashboard.setResumeSyncStatus?.(saved);
+    render();
+    if (announce && (saved.activeProfileLabel || saved.profile || saved.experiences)) dashboard.flash(`已同步“${saved.activeProfileLabel || '当前'}”简历，岗位匹配分已更新。`);
+  }
+
   installEvents();
   load().catch(error => dashboard.flash(`读取岗位库失败：${error.message}`, true));
+
+  if (globalThis.chrome?.storage?.onChanged?.addListener) {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local') return;
+      const resumeKeys = ['resumeProfiles', 'activeProfileId', 'activeProfileLabel', 'profile', 'experiences'];
+      if (!resumeKeys.some(key => changes[key])) return;
+      dashboard.storage.get(resumeKeys).then(saved => syncResumeProfile(saved)).catch(error => dashboard.flash(`简历同步失败：${error.message}`, true));
+    });
+  }
+  window.addEventListener('resume-profile-updated', event => syncResumeProfile(event.detail || {}).catch(error => dashboard.flash(`简历同步失败：${error.message}`, true)));
 })();

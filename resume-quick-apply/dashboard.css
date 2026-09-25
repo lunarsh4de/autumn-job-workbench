@@ -210,6 +210,8 @@ tbody tr:last-child td { border-bottom: 0; }
 .source-banner > img { flex: 0 0 auto; width: 16px; height: 16px; filter: invert(38%) sepia(52%) saturate(957%) hue-rotate(128deg); }
 .source-banner p { flex: 1; min-width: 0; }
 .source-banner strong { color: var(--accent-dark); }
+.resume-sync-status { display: inline-block; margin-left: 6px; color: var(--accent-dark); font-weight: 650; }
+.resume-sync-status[data-state="empty"] { color: #8b6b2f; }
 .source-banner .text-link { flex: 0 0 auto; }
 .metric-icon.violet { background: #ece7f8; }
 .metric-icon.violet img { filter: invert(37%) sepia(30%) saturate(1335%) hue-rotate(220deg); }
@@ -227,7 +229,7 @@ tbody tr:last-child td { border-bottom: 0; }
 .catalog-browser { border: 1px solid var(--line); border-radius: 7px; background: #fff; box-shadow: var(--shadow); }
 .catalog-filter-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 16px 10px; }
 .catalog-filter-head > span { color: var(--muted); font-size: 10px; }
-.catalog-filters { display: grid; grid-template-columns: minmax(210px, 1.45fr) minmax(170px, 1fr) repeat(6, minmax(88px, 1fr)) auto; gap: 7px; padding: 0 16px 14px; }
+.catalog-filters { display: grid; grid-template-columns: minmax(210px, 1.45fr) minmax(170px, 1fr) repeat(7, minmax(88px, 1fr)) auto; gap: 7px; padding: 0 16px 14px; }
 .catalog-filters select { min-width: 0; height: 34px; min-height: 34px; padding: 6px 7px; font-size: 11px; }
 .catalog-search, .catalog-filter-input { display: flex; align-items: center; gap: 6px; min-width: 0; height: 34px; border: 1px solid var(--line-strong); border-radius: 5px; padding: 0 8px; }
 .catalog-search:focus-within, .catalog-filter-input:focus-within { border-color: #67a3db; box-shadow: 0 0 0 2px #deedfa; }
@@ -236,6 +238,7 @@ tbody tr:last-child td { border-bottom: 0; }
 .catalog-table { border-width: 1px 0 0; border-radius: 0; box-shadow: none; }
 .catalog-table th, .catalog-table td { padding: 11px 13px; }
 .catalog-company-cell { color: #27528d; font-size: 11px; font-weight: 650; white-space: nowrap; }
+.company-type-badge { display: block; width: fit-content; margin-top: 4px; border-radius: 4px; padding: 2px 5px; background: #eaf4f0; color: #23705b; font-size: 9px; font-weight: 700; }
 .catalog-job-copy { display: grid; min-width: 260px; }
 .catalog-job-copy strong { color: var(--ink); font-size: 12px; }
 .catalog-job-copy span { overflow: hidden; margin-top: 3px; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }

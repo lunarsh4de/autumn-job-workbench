@@ -46,6 +46,24 @@
     flash.timer = setTimeout(() => { toast.hidden = true; }, 3200);
   }
 
+  function setResumeSyncStatus(saved = {}) {
+    const node = document.querySelector('#resume-sync-status');
+    if (!node) return;
+    const label = typeof saved.activeProfileLabel === 'string' ? saved.activeProfileLabel.trim() : '';
+    const profiles = Array.isArray(saved.resumeProfiles) ? saved.resumeProfiles : [];
+    const active = profiles.find(item => item?.id === saved.activeProfileId) || profiles.find(item => item?.label === label);
+    const hasResumeData = Boolean(label || saved.profile || saved.experiences || active);
+    if (!hasResumeData) {
+      node.textContent = '尚未检测到插件简历';
+      node.dataset.state = 'empty';
+      return;
+    }
+    const updatedAt = Number(active?.updatedAt);
+    const stamp = Number.isFinite(updatedAt) ? ` · 最近同步 ${dateTimeFormat.format(new Date(updatedAt))}` : '';
+    node.textContent = `插件简历已同步：${label || active?.label || '当前档案'}${stamp}`;
+    node.dataset.state = 'ready';
+  }
+
   function initials(company) {
     const value = company.replace(/(?:有限公司|集团|科技|网络|公司)$/g, '').trim();
     return (value.match(/[\p{Script=Han}A-Za-z0-9]/gu) || ['?']).slice(0, 2).join('').toUpperCase();
@@ -569,7 +587,8 @@
   }
 
   async function load() {
-    const saved = await storage.get(['jobTrackerItems', 'applications']);
+    const saved = await storage.get(['jobTrackerItems', 'applications', 'resumeProfiles', 'activeProfileId', 'activeProfileLabel', 'profile', 'experiences']);
+    setResumeSyncStatus(saved);
     const merged = TD.mergeApplications(saved.jobTrackerItems, saved.applications);
     state.items = merged.items;
     if (merged.added || !Array.isArray(saved.jobTrackerItems)) await storage.set({ jobTrackerItems: state.items });
@@ -584,13 +603,17 @@
     showView,
     flash,
     getItems: () => [...state.items],
-    storage
+    storage,
+    setResumeSyncStatus
   };
   load().catch(error => flash(`读取工作台失败：${error.message}`, true));
 
   if (globalThis.chrome?.storage?.onChanged?.addListener) {
     chrome.storage.onChanged.addListener((changes, area) => {
-      if (area !== 'local' || !changes.applications) return;
+      if (area !== 'local') return;
+      const resumeKeys = ['resumeProfiles', 'activeProfileId', 'activeProfileLabel', 'profile', 'experiences'];
+      if (resumeKeys.some(key => changes[key])) storage.get(resumeKeys).then(setResumeSyncStatus).catch(() => {});
+      if (!changes.applications) return;
       const merged = TD.mergeApplications(state.items, changes.applications.newValue);
       if (!merged.added) return;
       state.items = merged.items;

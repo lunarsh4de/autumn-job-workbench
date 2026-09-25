@@ -43,6 +43,21 @@ class RefreshJobsTests(unittest.TestCase):
         self.assertEqual(job["province"], "浙江")
         self.assertEqual(job["city"], "杭州")
 
+    def test_greenhouse_keeps_mainland_china_and_excludes_hong_kong(self):
+        payload = {"jobs": [
+            {"title": "China Product Manager", "location": {"name": "Shanghai, China"}, "absolute_url": "https://example.com/cn", "content": "<p>Build&nbsp;products</p>"},
+            {"title": "APAC Product Manager", "location": {"name": "Hong Kong"}, "absolute_url": "https://example.com/hk"},
+            {"title": "Singapore Product Manager", "location": {"name": "Singapore"}, "absolute_url": "https://example.com/sg"},
+        ]}
+        source = {"id": "greenhouse", "name": "外企", "company": "Airbnb", "mainland_china_only": True, "url": "https://example.com"}
+        rows = refresh_jobs.adapt_greenhouse(payload, source)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["location"], "Shanghai, China")
+        self.assertEqual(rows[0]["companyType"], "外企")
+        self.assertEqual(rows[0]["description"], " Build\xa0products ")
+        normalized = refresh_jobs.normalize(rows[0], source)
+        self.assertEqual(normalized["companyType"], "外企（中国大陆）")
+
 
 if __name__ == "__main__":
     unittest.main()
