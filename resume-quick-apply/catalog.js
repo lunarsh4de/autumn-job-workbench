@@ -10,6 +10,7 @@
     query: '', companyQuery: '', province: 'all', city: 'all', jobType: 'all', companyType: 'all', platform: 'all', score: 'all', sort: 'match', visible: 200
   };
   let resumeCandidate = null;
+  let publicSyncing = false;
 
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -252,14 +253,21 @@
   }
 
   async function syncPublicFeed(force = false) {
-    const saved = await dashboard.storage.get(['publicCatalogSync']);
-    const previous = saved.publicCatalogSync;
-    if (!force && previous?.at && Date.now() - previous.at < 6 * 60 * 60 * 1000) {
-      setPublicStatus(`公共源已同步 ${previous.total || 0} 条（${new Date(previous.at).toLocaleString('zh-CN')}）`, 'ready');
+    if (publicSyncing) {
+      if (force) dashboard.flash('公共源正在同步，请稍候。');
       return false;
     }
-    setPublicStatus('正在同步 GitHub Actions 公共岗位源...', 'loading');
+    publicSyncing = true;
+    const trigger = document.querySelector('#sync-public-catalog');
+    if (trigger) trigger.disabled = true;
     try {
+      const saved = await dashboard.storage.get(['publicCatalogSync']);
+      const previous = saved.publicCatalogSync;
+      if (!force && previous?.at && Date.now() - previous.at < 6 * 60 * 60 * 1000) {
+        setPublicStatus(`公共源已同步 ${previous.total || 0} 条（${new Date(previous.at).toLocaleString('zh-CN')}）`, 'ready');
+        return false;
+      }
+      setPublicStatus('正在同步 GitHub Actions 公共岗位源...', 'loading');
       const response = await fetch(`jobs.json?refresh=${Date.now()}`, { cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer' });
       if (response.status === 404) {
         setPublicStatus('当前为插件/本地模式，可手动导入；Pages 发布后将自动同步', 'local');
@@ -287,6 +295,9 @@
       setPublicStatus(publicSyncError(error), 'error', error?.message || '');
       if (force) dashboard.flash('公共岗位暂时无法同步，请稍后重试；本地岗位未受影响。', true);
       return false;
+    } finally {
+      publicSyncing = false;
+      if (trigger) trigger.disabled = false;
     }
   }
 
