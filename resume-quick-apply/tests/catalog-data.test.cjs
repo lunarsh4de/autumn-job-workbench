@@ -57,6 +57,14 @@ test('catalog falls back to a bounded category for unknown new roles', () => {
   assert.equal(job.city, '上海');
 });
 
+test('catalog classifies common bilingual job titles into bounded categories', () => {
+  assert.equal(C.classifyJobType({ title: 'Product Operations Intern' }), '产品项目');
+  assert.equal(C.classifyJobType({ title: 'Management Trainee' }), '职能管培');
+  assert.equal(C.classifyJobType({ title: 'User Growth Intern' }), '运营市场');
+  assert.equal(C.classifyJobType({ title: '软件实施工程师' }), '技术研发');
+  assert.equal(C.classifyJobType({ title: '系统策划' }), '产品项目');
+});
+
 test('catalog normalizes mainland foreign-company labels and derives resume preferences', () => {
   const job = C.item({ company: 'Airbnb', title: '产品经理', location: '上海', companyType: '外企' });
   assert.equal(job.companyType, '外企（中国大陆）');

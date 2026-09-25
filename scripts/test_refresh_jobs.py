@@ -47,6 +47,13 @@ class RefreshJobsTests(unittest.TestCase):
         self.assertEqual(refresh_jobs.region_parts({"location": "江苏-泰州-海陵区"}), ("江苏", "泰州"))
         self.assertEqual(refresh_jobs.region_parts({"location": "新余-新余-渝水区"}), ("江西", "新余"))
 
+    def test_classifies_common_bilingual_job_titles(self):
+        self.assertEqual(refresh_jobs.classify_job_type({"title": "Product Operations Intern"}), "产品项目")
+        self.assertEqual(refresh_jobs.classify_job_type({"title": "Management Trainee"}), "职能管培")
+        self.assertEqual(refresh_jobs.classify_job_type({"title": "User Growth Intern"}), "运营市场")
+        self.assertEqual(refresh_jobs.classify_job_type({"title": "软件实施工程师"}), "技术研发")
+        self.assertEqual(refresh_jobs.classify_job_type({"title": "系统策划"}), "产品项目")
+
     def test_greenhouse_keeps_mainland_china_and_excludes_hong_kong(self):
         payload = {"jobs": [
             {"title": "China Product Manager", "location": {"name": "Shanghai, China"}, "absolute_url": "https://example.com/cn", "content": "<p>Build&nbsp;products</p>"},
