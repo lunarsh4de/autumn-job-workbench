@@ -508,7 +508,25 @@
   let submissionObserver = null;
   let submissionTimer = null;
   let submissionBaseline = new Map();
+  const submissionMarkerKey = 'rqa-pending-submission';
+  const submissionMarkerTtl = 2 * 60 * 1000;
   const successPattern = /投递成功|申请成功|提交成功|成功提交|已成功投递|投递完成|申请已提交|已完成申请|感谢(?:您|你的)?(?:申请|投递)|thank you for (?:applying|your application)|application (?:has been )?(?:submitted|received)|(?:submission|application) successful|successfully applied/i;
+  function clearSubmissionMarker() {
+    try { window.sessionStorage.removeItem(submissionMarkerKey); } catch {}
+  }
+  function readSubmissionMarker() {
+    try {
+      const value = JSON.parse(window.sessionStorage.getItem(submissionMarkerKey) || 'null');
+      if (!value || !Number.isFinite(value.startedAt) || Date.now() - value.startedAt > submissionMarkerTtl) {
+        clearSubmissionMarker();
+        return null;
+      }
+      return value;
+    } catch { return null; }
+  }
+  function markSubmissionPending() {
+    try { window.sessionStorage.setItem(submissionMarkerKey, JSON.stringify({ startedAt: Date.now(), url: location.href })); } catch {}
+  }
   function successCandidates() {
     const doc = window.document;
     if (!doc?.querySelectorAll) return [];
@@ -530,6 +548,7 @@
     submissionObserver = null;
     window.clearTimeout(submissionTimer);
     submissionTimer = null;
+    clearSubmissionMarker();
   }
   function checkSubmissionSuccess() {
     if (!visibleSuccessMessage()) return;
@@ -539,6 +558,7 @@
   function watchSubmissionResult() {
     stopSubmissionWatch();
     submissionBaseline = new Map(successCandidates().map(element => [element, (element.innerText || element.textContent || '').trim()]));
+    markSubmissionPending();
     submissionObserver = new MutationObserver(checkSubmissionSuccess);
     submissionObserver.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
     submissionTimer = window.setTimeout(stopSubmissionWatch, 2 * 60 * 1000);
@@ -551,6 +571,17 @@
     const text = control?.textContent?.trim() || control?.value?.trim() || '';
     if (/提交申请|确认提交|立即申请|投递简历|预览并提交|submit application|apply now/i.test(text)) watchSubmissionResult();
   }, true);
+  function resumeRedirectedSubmission(marker) {
+    if (!marker) return;
+    if (successCandidates().length) {
+      clearSubmissionMarker();
+      markApplied('auto').catch(error => showStatus(`自动记录失败：${error.message}。请点击“标记已投递”重试。`, 'warning'));
+      return;
+    }
+    watchSubmissionResult();
+  }
+  const redirectedSubmissionAtLoad = readSubmissionMarker();
+  window.setTimeout(() => resumeRedirectedSubmission(redirectedSubmissionAtLoad), 0);
 
   function showStatus(text, type = 'normal') {
     if (!uiRoot) mount();

@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { content, pdf } = require('./helpers.cjs');
+const { content, pdf, setup, source } = require('./helpers.cjs');
 
 test('own details fill while username, emergency contact and password remain untouched', async t => {
   const h = content(t, `<input id="own" autocomplete="section-applicant name">
@@ -218,6 +218,17 @@ test('common foreign ATS confirmation text is recorded automatically', async t =
   assert.equal(h.data.applications.length, 1);
   assert.equal(h.data.applications[0].status, 'submitted');
   assert.equal(h.data.applications[0].source, 'auto');
+});
+
+test('redirected ATS confirmation resumes automatic recording from the tab marker', async t => {
+  const h = setup(t, '<main><h1>Data Analyst</h1><div role="status">Your application has been received.</div></main>', {}, 'https://jobs.example.test/confirmation');
+  h.w.sessionStorage.setItem('rqa-pending-submission', JSON.stringify({ startedAt: Date.now() - 1000, url: 'https://jobs.example.test/apply' }));
+  h.w.eval(source('content.js'));
+  await new Promise(resolve => setTimeout(resolve, 25));
+  assert.equal(h.data.applications.length, 1);
+  assert.equal(h.data.applications[0].status, 'submitted');
+  assert.equal(h.data.applications[0].source, 'auto');
+  assert.equal(h.w.sessionStorage.getItem('rqa-pending-submission'), null);
 });
 
 test('company identity ignores generic Moka metadata and normalizes DJI career hosts', async t => {
