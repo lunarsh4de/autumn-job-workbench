@@ -166,6 +166,12 @@ try {
   const trackedMetadata = await waitForEvaluation(client, `(() => { const card=document.querySelector('#kanban .job-card'); return !document.querySelector('#view-board').hidden && card ? {text:card.textContent, companyType:card.textContent.includes('外企（中国大陆）'), jobType:card.textContent.includes('数据算法'), platform:card.textContent.includes('公开清单')} : null; })()`);
   if (!trackedMetadata.companyType || !trackedMetadata.jobType || !trackedMetadata.platform) throw new Error(`Catalog tracking metadata smoke test failed: ${JSON.stringify(trackedMetadata)}`);
   await client.send('Runtime.evaluate', { expression: `globalThis.JobTrackerDashboard.showView('catalog')` });
+  const resetCheck = await client.send('Runtime.evaluate', {
+    expression: `(()=>{document.querySelector('#reset-catalog-filters').click();return {cityOptions:[...document.querySelector('#catalog-city').options].map(option=>option.textContent),result:document.querySelector('#catalog-result-count').textContent};})()`,
+    returnByValue: true
+  });
+  const resetValue = resetCheck.result.value;
+  if (!resetValue.cityOptions.includes('北京') || resetValue.result !== '5 个岗位') throw new Error(`Catalog reset smoke test failed: ${JSON.stringify(resetValue)}`);
   await client.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
   await wait(250);
   const dashboard = await client.send('Runtime.evaluate', {
@@ -242,7 +248,7 @@ try {
       throw new Error(`Resume import did not persist structured experiences: ${JSON.stringify(resumeImport.applied)}`);
     }
   }
-  console.log(JSON.stringify({ edge, extension, popup: value, dashboard: dashboard.result.value, publicStatus, emptyResumeStatus, syncedResumeStatus, catalogFilters: filterValue, trackedMetadata, mobile: mobile.result.value, screenshots: [desktopPath, mobilePath], resumeImport, profileRoot }, null, 2));
+  console.log(JSON.stringify({ edge, extension, popup: value, dashboard: dashboard.result.value, publicStatus, emptyResumeStatus, syncedResumeStatus, catalogFilters: filterValue, trackedMetadata, resetValue, mobile: mobile.result.value, screenshots: [desktopPath, mobilePath], resumeImport, profileRoot }, null, 2));
   await client.send('Browser.close');
 } finally {
   client?.close();

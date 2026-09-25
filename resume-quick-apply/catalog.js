@@ -356,7 +356,7 @@
     document.querySelector('#catalog-platform').value = 'all';
     document.querySelector('#catalog-score').value = 'all';
     document.querySelector('#catalog-sort').value = 'match';
-    renderTable();
+    render();
   }
 
   function installEvents() {
