@@ -116,7 +116,7 @@ try {
   const value = popup.result.value;
   if (value.title !== '投简历助手' || !value.fill || !value.profile || !value.quickAttachment || !value.profileSelect || value.tabs !== 4) throw new Error(`Popup smoke test failed: ${JSON.stringify(value)}`);
   await client.send('Runtime.evaluate', {
-    expression: `(async()=>chrome.storage.local.set({jobTrackerItems:[
+    expression: `(async()=>chrome.storage.local.set({profile:{},experiences:{},resumeProfiles:[{id:'empty',label:'默认简历',profile:{},resume:null,settings:{},experiences:{}}],activeProfileId:'empty',activeProfileLabel:'默认简历',jobTrackerItems:[
       {id:'demo-1',company:'字节跳动',title:'产品经理',stage:'interview',priority:'high',location:'北京',salary:'25-40K',url:'https://jobs.example.test/1',nextActionAt:'2026-09-24T14:00',interviewAt:'2026-09-24T14:00',notes:'准备产品案例',source:'manual',createdAt:Date.now()-86400000,updatedAt:Date.now()},
       {id:'demo-2',company:'腾讯',title:'用户研究员',stage:'assessment',priority:'medium',location:'深圳',url:'https://jobs.example.test/2',nextActionAt:'2026-09-23T20:00',notes:'完成测评',source:'extension',createdAt:Date.now()-172800000,updatedAt:Date.now()-3600000},
       {id:'demo-3',company:'小米',title:'产品运营',stage:'applied',priority:'normal',location:'上海',url:'https://jobs.example.test/3',deadline:'2026-10-10',notes:'',source:'extension',createdAt:Date.now()-259200000,updatedAt:Date.now()-7200000},
@@ -128,6 +128,10 @@ try {
   await waitForEvaluation(client, `document.querySelectorAll('#view-catalog .metric-card').length===4 && document.querySelector('#catalog-total').textContent!=='0'`);
   const publicStatus = await waitForEvaluation(client, `(() => { const node=document.querySelector('#public-sync-status'); return node && node.dataset.state !== 'loading' ? {state:node.dataset.state,text:node.textContent} : null; })()`);
   if (!publicStatus || /Failed to fetch|NetworkError|Load failed/i.test(publicStatus.text)) throw new Error(`Public source status smoke test failed: ${JSON.stringify(publicStatus)}`);
+  const emptyResumeStatus = await waitForEvaluation(client, `(() => { const node=document.querySelector('#resume-sync-status'); return node?.dataset.state === 'empty' ? node.textContent : null; })()`);
+  if (emptyResumeStatus !== '尚未检测到插件简历') throw new Error(`Empty resume status smoke test failed: ${JSON.stringify(emptyResumeStatus)}`);
+  await client.send('Runtime.evaluate', { expression: `chrome.storage.local.set({profile:{name:'测试候选人',city:'上海',skills:'SQL'},experiences:{work:[{role:'产品经理',location:'上海'}]},activeProfileLabel:'产品版'})`, awaitPromise: true });
+  const syncedResumeStatus = await waitForEvaluation(client, `(() => { const node=document.querySelector('#resume-sync-status'); return node?.dataset.state === 'ready' && /产品版/.test(node.textContent) ? node.textContent : null; })()`);
   await client.send('Runtime.evaluate', {
       expression: `(()=>{document.querySelector('#open-import').click();const input=document.querySelector('#catalog-paste');input.value='公司,岗位,地点,链接,平台,标签,企业类型,岗位类型\\n示例科技,数据分析师,上海,https://jobs.example.test/imported,公开清单,"SQL,Python",外企（中国大陆）,数据算法';input.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#import-form').requestSubmit();})()`
   });
@@ -228,7 +232,7 @@ try {
       throw new Error(`Resume import did not persist structured experiences: ${JSON.stringify(resumeImport.applied)}`);
     }
   }
-  console.log(JSON.stringify({ edge, extension, popup: value, dashboard: dashboard.result.value, publicStatus, catalogFilters: filterValue, mobile: mobile.result.value, screenshots: [desktopPath, mobilePath], resumeImport, profileRoot }, null, 2));
+  console.log(JSON.stringify({ edge, extension, popup: value, dashboard: dashboard.result.value, publicStatus, emptyResumeStatus, syncedResumeStatus, catalogFilters: filterValue, trackedMetadata, mobile: mobile.result.value, screenshots: [desktopPath, mobilePath], resumeImport, profileRoot }, null, 2));
   await client.send('Browser.close');
 } finally {
   client?.close();

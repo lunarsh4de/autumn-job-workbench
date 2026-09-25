@@ -51,7 +51,14 @@
     const label = typeof saved.activeProfileLabel === 'string' ? saved.activeProfileLabel.trim() : '';
     const profiles = Array.isArray(saved.resumeProfiles) ? saved.resumeProfiles : [];
     const active = profiles.find(item => item?.id === saved.activeProfileId) || profiles.find(item => item?.label === label);
-    const hasResumeData = Boolean(label || saved.profile || saved.experiences || active);
+    const hasValue = value => {
+      if (typeof value === 'string') return Boolean(value.trim());
+      if (Array.isArray(value)) return value.some(hasValue);
+      if (value && typeof value === 'object') return Object.values(value).some(hasValue);
+      return false;
+    };
+    const hasResumeData = hasValue(saved.profile) || hasValue(saved.resume) || hasValue(saved.experiences)
+      || hasValue(active?.profile) || hasValue(active?.resume) || hasValue(active?.experiences);
     const profileStatus = document.querySelector('#profile-resume-status');
     const profileEntryStatus = document.querySelector('#profile-entry-status');
     if (profileStatus) profileStatus.textContent = hasResumeData ? '已同步' : '未同步';
