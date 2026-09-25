@@ -133,6 +133,7 @@ test('dashboard exposes a disabled button affordance and keeps profile toasts ou
   assert.match(css, /\.button:disabled \{[^}]*cursor: not-allowed/);
   assert.match(css, /#view-profile \{ padding-bottom: 112px; \}/);
   assert.match(dashboard, /document\.documentElement\.dataset\.activeView = name/);
+  assert.match(dashboard, /#view-profile:not\(\[hidden\]\)/);
 });
 
 test('resume parsers are self-hosted with licenses and no remote script tags', () => {
