@@ -84,6 +84,9 @@ h3 { font-size: 15px; line-height: 1.3; }
 .button.ghost { border-color: transparent; background: transparent; }
 .button.danger { color: var(--danger); }
 .button.compact { min-height: 28px; padding: 4px 7px; font-size: 10px; }
+.button:disabled { cursor: not-allowed; opacity: .52; filter: grayscale(.15); }
+.button.primary:disabled, .button.primary:disabled:hover { background: var(--accent); }
+.button.secondary:disabled, .button.secondary:disabled:hover { border-color: var(--line); background: #fff; }
 .icon-button { display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 5px; background: transparent; }
 .icon-button:hover { background: var(--soft); }
 .mobile-menu { display: none; }
@@ -299,6 +302,7 @@ tbody tr:last-child td { border-bottom: 0; }
 .github-backup-copy { margin-top: 8px; color: var(--muted); font-size: 11px; line-height: 1.6; }
 .github-backup-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
 .github-backup-status { margin-top: 8px; color: var(--muted); font-size: 11px; }
+.github-backup-status { overflow-wrap: anywhere; }
 .github-backup-status[data-error="true"] { color: var(--danger); }
 .github-backup-status[data-local="true"] { color: #536b72; }
 .profile-layout { display: grid; grid-template-columns: minmax(300px, .9fr) minmax(350px, 1.1fr); gap: 12px; }
@@ -376,6 +380,7 @@ dialog::backdrop { background: rgb(18 28 33 / 43%); backdrop-filter: blur(2px); 
 
 @media (max-width: 760px) {
   .toast { top: auto; right: 16px; bottom: 16px; left: 16px; max-width: none; }
+  #view-profile { padding-bottom: 112px; }
   .sidebar { width: 228px; transform: translateX(-100%); transition: transform .2s ease; }
   .sidebar.open { transform: translateX(0); box-shadow: 16px 0 50px rgb(17 28 34 / 24%); }
   .sidebar-backdrop { position: fixed; z-index: 15; inset: 0; display: block; border: 0; padding: 0; background: rgb(17 28 34 / 34%); }

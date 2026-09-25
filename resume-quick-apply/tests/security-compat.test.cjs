@@ -117,6 +117,24 @@ test('GitHub backup restore clears optional local state omitted by older backups
   assert.deepEqual(patch.resumeAutoPreferences, { roles: '', skills: '', cities: '' });
 });
 
+test('GitHub sync preserves refreshed token metadata and reports backup freshness', () => {
+  const sync = source('github-sync.js');
+  assert.match(sync, /githubGistRefreshToken', 'githubGistExpiresAt', 'githubGistId', 'githubBackupAt/);
+  assert.match(sync, /const latest = await storage\.get\(\['githubGistRefreshToken', 'githubGistExpiresAt', 'githubGistId', 'githubBackupAt'\]\)/);
+  assert.match(sync, /latest\.githubGistRefreshToken \|\| login\.refreshToken/);
+  assert.match(sync, /'githubGistId', 'githubBackupAt'\]\)\.then\(async stored/);
+  assert.match(sync, /备份已超过 24 小时未更新/);
+  assert.match(sync, /最近备份：\$\{savedAt\}/);
+});
+
+test('dashboard exposes a disabled button affordance and keeps profile toasts out of backup actions', () => {
+  const css = source('dashboard.css');
+  const dashboard = source('dashboard.js');
+  assert.match(css, /\.button:disabled \{[^}]*cursor: not-allowed/);
+  assert.match(css, /#view-profile \{ padding-bottom: 112px; \}/);
+  assert.match(dashboard, /document\.documentElement\.dataset\.activeView = name/);
+});
+
 test('resume parsers are self-hosted with licenses and no remote script tags', () => {
   const path = require('node:path');
   const root = path.join(__dirname, '..', 'vendor');

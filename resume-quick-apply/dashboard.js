@@ -448,6 +448,7 @@
     const sidebar = document.querySelector('#sidebar');
     const wasSidebarOpen = sidebar?.classList.contains('open');
     state.view = name;
+    document.documentElement.dataset.activeView = name;
     for (const candidate of document.querySelectorAll('.view')) candidate.hidden = candidate !== view;
     for (const item of document.querySelectorAll('[data-view]')) item.classList.toggle('active', item.dataset.view === name);
     document.querySelector('#view-title').textContent = view.dataset.title;

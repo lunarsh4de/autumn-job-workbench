@@ -46,6 +46,16 @@
     status.dataset.local = String(localOnly);
   }
 
+  function backupStatus(login, gistId, backupAt) {
+    if (!gistId) return `已连接 GitHub：${login}。个人备份仍需点击“保存到 GitHub”。`;
+    const timestamp = Number(backupAt);
+    if (!Number.isFinite(timestamp) || timestamp <= 0) return `已连接 GitHub：${login}，已有私有备份可恢复。`;
+    const age = Date.now() - timestamp;
+    const savedAt = new Date(timestamp).toLocaleString('zh-CN');
+    if (age > 24 * 60 * 60 * 1000) return `已连接 GitHub：${login}，最近备份：${savedAt}。备份已超过 24 小时未更新。`;
+    return `已连接 GitHub：${login}，最近备份：${savedAt}。`;
+  }
+
   function setConnectedUi(login = '', gistId = '') {
     const connected = Boolean(login && token);
     signIn.hidden = connected;
@@ -116,13 +126,14 @@
     signIn.disabled = true;
     try {
       if (!globalThis.chrome?.runtime?.id) throw new Error('GitHub 授权需要从已安装的投简历助手工作台打开。');
-      const stored = await storage.get(['githubGistToken', 'githubGistId']);
+      const stored = await storage.get(['githubGistToken', 'githubGistRefreshToken', 'githubGistExpiresAt', 'githubGistId', 'githubBackupAt']);
       const login = stored.githubGistToken ? { token: stored.githubGistToken, refreshToken: stored.githubGistRefreshToken || '', expiresAt: stored.githubGistExpiresAt || 0 } : await deviceLogin();
       token = login.token;
       const user = await github('/user');
-      await storage.set({ githubGistToken: token, githubGistRefreshToken: login.refreshToken || null, githubGistExpiresAt: login.expiresAt || 0, githubUserLogin: user.login });
-      setConnectedUi(user.login, stored.githubGistId || '');
-      setStatus(stored.githubGistId ? `已连接 GitHub：${user.login}，已有私有备份可恢复。` : `已连接 GitHub：${user.login}。个人备份仍需点击“保存到 GitHub”。`);
+      const latest = await storage.get(['githubGistRefreshToken', 'githubGistExpiresAt', 'githubGistId', 'githubBackupAt']);
+      await storage.set({ githubGistToken: token, githubGistRefreshToken: latest.githubGistRefreshToken || login.refreshToken || null, githubGistExpiresAt: latest.githubGistExpiresAt || login.expiresAt || 0, githubUserLogin: user.login });
+      setConnectedUi(user.login, latest.githubGistId || '');
+      setStatus(backupStatus(user.login, latest.githubGistId || '', latest.githubBackupAt));
     } catch (error) {
       token = '';
       setStatus(`GitHub 连接失败：${error.message}`, true);
@@ -207,13 +218,14 @@
     if (restore) restore.disabled = true;
     setStatus('网页版仅保存在本机；GitHub 私有备份请从投简历助手工作台打开。', false, true);
   }
-  storage.get(['githubGistToken', 'githubUserLogin', 'githubGistRefreshToken', 'githubGistExpiresAt', 'githubGistId']).then(async stored => {
+  storage.get(['githubGistToken', 'githubUserLogin', 'githubGistRefreshToken', 'githubGistExpiresAt', 'githubGistId', 'githubBackupAt']).then(async stored => {
     if (!stored.githubGistToken) return;
     token = stored.githubGistToken;
     try {
       const user = await github('/user');
-      setConnectedUi(user.login, stored.githubGistId || '');
-      setStatus(stored.githubGistId ? `已连接 GitHub：${user.login}，已有私有备份可恢复。` : `已连接 GitHub：${user.login}。`);
+      const latest = await storage.get(['githubGistId', 'githubBackupAt']);
+      setConnectedUi(user.login, latest.githubGistId || '');
+      setStatus(backupStatus(user.login, latest.githubGistId || '', latest.githubBackupAt));
     } catch { token = ''; await storage.set({ githubGistToken: null, githubGistRefreshToken: null, githubGistExpiresAt: null, githubUserLogin: null }); setConnectedUi(''); }
   }).then(() => {
     if (!token) updateProfileUi('');
