@@ -126,9 +126,9 @@ try {
   });
   await client.send('Page.navigate', { url: `chrome-extension://${extensionId}/dashboard.html` });
   await waitForEvaluation(client, `document.querySelectorAll('#view-catalog .metric-card').length===4 && document.querySelector('#catalog-total').textContent!=='0'`);
-  const publicStatus = await waitForEvaluation(client, `(() => { const node=document.querySelector('#public-sync-status'); const button=document.querySelector('#sync-public-catalog'); return node && node.dataset.state !== 'loading' ? {state:node.dataset.state,text:node.textContent,syncButtonEnabled:!button.disabled} : null; })()`);
-  if (!publicStatus || /Failed to fetch|NetworkError|Load failed/i.test(publicStatus.text)) throw new Error(`Public source status smoke test failed: ${JSON.stringify(publicStatus)}`);
-  if (!publicStatus.syncButtonEnabled) throw new Error(`Public source sync button did not recover: ${JSON.stringify(publicStatus)}`);
+  const publicStatus = await waitForEvaluation(client, `(() => { const node=document.querySelector('#public-sync-status'); const button=document.querySelector('#sync-public-catalog'); return node && node.dataset.state !== 'loading' ? {state:node.dataset.state,text:node.textContent,title:node.title,syncButtonEnabled:!button.disabled} : null; })()`);
+  if (!publicStatus || /Failed to fetch|NetworkError|Load failed/i.test(`${publicStatus.text} ${publicStatus.title}`)) throw new Error(`Public source status smoke test failed: ${JSON.stringify(publicStatus)}`);
+  if (!publicStatus.syncButtonEnabled || (publicStatus.state === 'ready' && !/来源 \d+\/\d+ 正常/.test(publicStatus.text))) throw new Error(`Public source health status failed: ${JSON.stringify(publicStatus)}`);
   const emptyResumeStatus = await waitForEvaluation(client, `(() => { const node=document.querySelector('#resume-sync-status'); return node?.dataset.state === 'empty' ? node.textContent : null; })()`);
   if (emptyResumeStatus !== '尚未检测到插件简历') throw new Error(`Empty resume status smoke test failed: ${JSON.stringify(emptyResumeStatus)}`);
   await client.send('Runtime.evaluate', { expression: `chrome.storage.local.set({profile:{name:'测试候选人',city:'上海',skills:'SQL'},experiences:{work:[{role:'产品经理',location:'上海'}]},activeProfileLabel:'产品版'})`, awaitPromise: true });

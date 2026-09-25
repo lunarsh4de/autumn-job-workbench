@@ -252,6 +252,27 @@
     return `公共源同步失败：${detail || '请稍后重试。'}`;
   }
 
+  function sourceHealth(sources) {
+    const enabled = (Array.isArray(sources) ? sources : []).filter(source => source?.status !== 'disabled');
+    const ok = enabled.filter(source => source?.status === 'ok');
+    const failed = enabled.filter(source => source?.status !== 'ok');
+    return {
+      enabled: enabled.length,
+      ok: ok.length,
+      failed: failed.map(source => source?.name || source?.id || '未知来源').slice(0, 5)
+    };
+  }
+
+  function sourceHealthLabel(health) {
+    if (!health?.enabled) return '';
+    return `来源 ${health.ok}/${health.enabled} 正常`;
+  }
+
+  function sourceHealthDetail(health) {
+    if (!health?.failed?.length) return '';
+    return `未成功来源：${health.failed.join('、')}`;
+  }
+
   async function syncPublicFeed(force = false) {
     if (publicSyncing) {
       if (force) dashboard.flash('公共源正在同步，请稍候。');
@@ -264,7 +285,8 @@
       const saved = await dashboard.storage.get(['publicCatalogSync']);
       const previous = saved.publicCatalogSync;
       if (!force && previous?.at && Date.now() - previous.at < 6 * 60 * 60 * 1000) {
-        setPublicStatus(`公共源已同步 ${previous.total || 0} 条（${new Date(previous.at).toLocaleString('zh-CN')}）`, 'ready');
+        const healthLabel = sourceHealthLabel(previous.sources);
+        setPublicStatus(`公共源已同步 ${previous.total || 0} 条${healthLabel ? ` · ${healthLabel}` : ''}（${new Date(previous.at).toLocaleString('zh-CN')}）`, 'ready', sourceHealthDetail(previous.sources));
         return false;
       }
       setPublicStatus('正在同步 GitHub Actions 公共岗位源...', 'loading');
@@ -285,14 +307,17 @@
       state.items = merged.items;
       const document = JSON.parse(content);
       const generatedAt = document?.meta?.generatedAt || '';
-      const sync = { at: Date.now(), total: parsed.length, generatedAt };
+      const health = sourceHealth(document?.meta?.sources);
+      const sync = { at: Date.now(), total: parsed.length, generatedAt, sources: health };
       await dashboard.storage.set({ publicCatalogSync: sync });
-      setPublicStatus(`公共源 ${parsed.length} 条，更新于 ${generatedAt ? new Date(generatedAt).toLocaleString('zh-CN') : '刚刚'}`, 'ready');
+      const healthLabel = sourceHealthLabel(health);
+      setPublicStatus(`公共源 ${parsed.length} 条${healthLabel ? ` · ${healthLabel}` : ''}，更新于 ${generatedAt ? new Date(generatedAt).toLocaleString('zh-CN') : '刚刚'}`, 'ready', sourceHealthDetail(health));
       render();
       if (force) dashboard.flash(`公共岗位已同步：新增 ${merged.added} 条，更新 ${merged.updated} 条。`);
       return true;
     } catch (error) {
-      setPublicStatus(publicSyncError(error), 'error', error?.message || '');
+      const message = publicSyncError(error);
+      setPublicStatus(message, 'error', message);
       if (force) dashboard.flash('公共岗位暂时无法同步，请稍后重试；本地岗位未受影响。', true);
       return false;
     } finally {
