@@ -57,6 +57,18 @@ class RefreshJobsTests(unittest.TestCase):
         self.assertEqual(refresh_jobs.classify_job_type({"title": "集控巡检"}), "供应链制造")
         self.assertEqual(refresh_jobs.classify_job_type({"title": "茶原料开发"}), "供应链制造")
 
+    def test_uses_source_category_tags_only_as_a_fallback(self):
+        self.assertEqual(refresh_jobs.classify_job_type({"title": "未命名技术岗", "tags": ["技术/IT"]}), "技术研发")
+        self.assertEqual(refresh_jobs.classify_job_type({"title": "游戏动作实习生", "tags": ["产品/设计"]}), "设计体验")
+        self.assertEqual(refresh_jobs.classify_job_type({"title": "产品经理", "tags": ["技术/IT"]}), "产品项目")
+
+    def test_classifies_low_ambiguity_long_tail_roles(self):
+        self.assertEqual(refresh_jobs.classify_job_type({"title": "实习施工员"}), "供应链制造")
+        self.assertEqual(refresh_jobs.classify_job_type({"title": "置业顾问"}), "销售客户")
+        self.assertEqual(refresh_jobs.classify_job_type({"title": "游戏3D场景实习生"}), "设计体验")
+        self.assertEqual(refresh_jobs.classify_job_type({"title": "风险管理"}), "金融法务")
+        self.assertEqual(refresh_jobs.classify_job_type({"title": "动物实验实习生"}), "教育医疗")
+
     def test_greenhouse_keeps_mainland_china_and_excludes_hong_kong(self):
         payload = {"jobs": [
             {"title": "China Product Manager", "location": {"name": "Shanghai, China"}, "absolute_url": "https://example.com/cn", "content": "<p>Build&nbsp;products</p>"},

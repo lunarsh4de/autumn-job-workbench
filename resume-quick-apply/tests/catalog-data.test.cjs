@@ -68,6 +68,20 @@ test('catalog classifies common bilingual job titles into bounded categories', (
   assert.equal(C.classifyJobType({ title: '茶原料开发' }), '供应链制造');
 });
 
+test('catalog uses source category tags only as a fallback', () => {
+  assert.equal(C.classifyJobType({ title: '未命名技术岗', tags: ['技术/IT'] }), '技术研发');
+  assert.equal(C.classifyJobType({ title: '游戏动作实习生', tags: ['产品/设计'] }), '设计体验');
+  assert.equal(C.classifyJobType({ title: '产品经理', tags: ['技术/IT'] }), '产品项目');
+});
+
+test('catalog classifies low-ambiguity long-tail roles', () => {
+  assert.equal(C.classifyJobType({ title: '实习施工员' }), '供应链制造');
+  assert.equal(C.classifyJobType({ title: '置业顾问' }), '销售客户');
+  assert.equal(C.classifyJobType({ title: '游戏3D场景实习生' }), '设计体验');
+  assert.equal(C.classifyJobType({ title: '风险管理' }), '金融法务');
+  assert.equal(C.classifyJobType({ title: '动物实验实习生' }), '教育医疗');
+});
+
 test('catalog normalizes mainland foreign-company labels and derives resume preferences', () => {
   const job = C.item({ company: 'Airbnb', title: '产品经理', location: '上海', companyType: '外企' });
   assert.equal(job.companyType, '外企（中国大陆）');
