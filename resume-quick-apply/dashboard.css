@@ -224,6 +224,7 @@ tbody tr:last-child td { border-bottom: 0; }
 .source-banner strong { color: var(--accent-dark); }
 #public-sync-status[data-state="error"] { color: var(--danger); }
 #public-sync-status[data-state="loading"] { color: #5c6d74; }
+.public-sync-detail { display: block; margin-top: 2px; color: var(--danger); font-size: 10px; }
 .resume-sync-status { display: inline-block; margin-left: 6px; color: var(--accent-dark); font-weight: 650; }
 .resume-sync-status[data-state="empty"] { color: #8b6b2f; }
 .source-banner .text-link { flex: 0 0 auto; }

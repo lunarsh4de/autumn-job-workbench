@@ -278,10 +278,15 @@
   function setPublicStatus(text, state = '', detail = '') {
     const status = document.querySelector('#public-sync-status');
     if (!status) return;
+    const detailNode = document.querySelector('#public-sync-detail');
     status.textContent = text;
     status.dataset.state = state;
     if (detail) status.title = detail;
     else status.removeAttribute('title');
+    if (detailNode) {
+      detailNode.textContent = detail;
+      detailNode.hidden = !detail;
+    }
   }
 
   function publicSyncError(error) {
@@ -297,7 +302,11 @@
     return {
       enabled: enabled.length,
       ok: ok.length,
-      failed: failed.map(source => source?.name || source?.id || '未知来源').slice(0, 5)
+      failed: failed.map(source => source?.name || source?.id || '未知来源').slice(0, 5),
+      errors: failed.map(source => {
+        const name = source?.name || source?.id || '未知来源';
+        return source?.error ? `${name}：${String(source.error).slice(0, 180)}` : name;
+      }).slice(0, 5)
     };
   }
 
@@ -308,7 +317,8 @@
 
   function sourceHealthDetail(health) {
     if (!health?.failed?.length) return '';
-    return `未成功来源：${health.failed.join('、')}`;
+    const failed = health.errors?.length ? health.errors : health.failed;
+    return `未成功来源：${failed.join('；')}。已保留当前浏览器中的岗位，可稍后重试。`;
   }
 
   async function syncPublicFeed(force = false) {

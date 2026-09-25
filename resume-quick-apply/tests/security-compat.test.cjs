@@ -170,6 +170,17 @@ test('resume sync waits for catalog readiness and ignores stale scoring generati
   assert.match(catalog, /catalogReady = true/);
 });
 
+test('catalog source health exposes partial failures in visible status markup', () => {
+  const catalog = source('catalog.js');
+  const dashboard = source('dashboard.html');
+  const css = source('dashboard.css');
+  assert.match(catalog, /errors: failed\.map/);
+  assert.match(catalog, /已保留当前浏览器中的岗位/);
+  assert.match(catalog, /#public-sync-detail/);
+  assert.match(dashboard, /id="public-sync-detail"/);
+  assert.match(css, /\.public-sync-detail/);
+});
+
 test('resume parsers are self-hosted with licenses and no remote script tags', () => {
   const path = require('node:path');
   const root = path.join(__dirname, '..', 'vendor');
