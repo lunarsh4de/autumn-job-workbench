@@ -40,10 +40,11 @@
     }
   }
 
-  function setStatus(message, error = false, localOnly = false) {
+  function setStatus(message, error = false, localOnly = false, busy = false) {
     status.textContent = message;
     status.dataset.error = String(error);
     status.dataset.local = String(localOnly);
+    status.setAttribute('aria-busy', String(busy));
   }
 
   function backupStatus(login, gistId, backupAt) {
@@ -87,7 +88,7 @@
     });
     const device = await response.json();
     if (!response.ok || !device.device_code) throw new Error(device.error_description || '无法启动 GitHub 授权。');
-    setStatus(`请打开 ${device.verification_uri}，输入代码 ${device.user_code} 完成授权。`);
+    setStatus(`请打开 ${device.verification_uri}，输入代码 ${device.user_code} 完成授权。`, false, false, true);
     window.open(device.verification_uri, '_blank', 'noopener,noreferrer');
     let interval = Math.max(5, Number(device.interval) || 5) * 1000;
     const deadline = Date.now() + Math.min(15 * 60 * 1000, Number(device.expires_in || 900) * 1000);
@@ -102,7 +103,7 @@
       if (result.access_token) return { token: result.access_token, refreshToken: result.refresh_token || '', expiresAt: result.expires_in ? Date.now() + Number(result.expires_in) * 1000 : 0 };
       if (result.error === 'slow_down') interval += 5000;
       else if (!['authorization_pending'].includes(result.error)) throw new Error(result.error_description || 'GitHub 授权未完成。');
-      setStatus(`等待 GitHub 授权确认…代码 ${device.user_code}`);
+      setStatus(`等待 GitHub 授权确认…代码 ${device.user_code}`, false, false, true);
     }
     throw new Error('GitHub 授权已超时，请重新开始。');
   }
@@ -124,6 +125,8 @@
 
   async function connect() {
     signIn.disabled = true;
+    signIn.setAttribute('aria-busy', 'true');
+    setStatus('正在连接 GitHub…', false, false, true);
     try {
       if (!globalThis.chrome?.runtime?.id) throw new Error('GitHub 授权需要从已安装的投简历助手工作台打开。');
       const stored = await storage.get(['githubGistToken', 'githubGistRefreshToken', 'githubGistExpiresAt', 'githubGistId', 'githubBackupAt']);
@@ -137,12 +140,18 @@
     } catch (error) {
       token = '';
       setStatus(`GitHub 连接失败：${error.message}`, true);
-    } finally { signIn.disabled = false; }
+    } finally {
+      signIn.disabled = false;
+      signIn.setAttribute('aria-busy', 'false');
+      status.setAttribute('aria-busy', 'false');
+    }
   }
 
   async function saveBackup() {
     if (!token) throw new Error('请先登录 GitHub。');
     save.disabled = true;
+    save.setAttribute('aria-busy', 'true');
+    setStatus('正在保存 GitHub 私有备份…', false, false, true);
     try {
       const snapshot = await storage.get(STORAGE_KEYS);
       const content = JSON.stringify({ schemaVersion: 1, savedAt: new Date().toISOString(), data: snapshot }, null, 2);
@@ -164,7 +173,11 @@
         setConnectedUi('');
       }
       setStatus(`GitHub 保存失败：${error.message}`, true);
-    } finally { save.disabled = !token; }
+    } finally {
+      save.disabled = !token;
+      save.setAttribute('aria-busy', 'false');
+      status.setAttribute('aria-busy', 'false');
+    }
   }
 
   async function disconnect() {
@@ -194,11 +207,16 @@
     if (!token) throw new Error('请先登录 GitHub。');
     if (!globalThis.BackupSyncData?.prepare) throw new Error('恢复组件未加载，请刷新页面后重试。');
     restore.disabled = true;
+    restore.setAttribute('aria-busy', 'true');
+    setStatus('正在读取 GitHub 私有备份…', false, false, true);
     try {
       const payload = await readBackupFile();
       const patch = BackupSyncData.prepare(payload);
       const count = Array.isArray(patch.jobTrackerItems) ? patch.jobTrackerItems.length : 0;
-      if (!confirm(`确认从 GitHub 恢复个人备份？这会覆盖当前浏览器中的简历、投递记录和${count}条看板记录。`)) return;
+      if (!confirm(`确认从 GitHub 恢复个人备份？这会覆盖当前浏览器中的简历、投递记录和${count}条看板记录。`)) {
+        setStatus('已取消恢复。');
+        return;
+      }
       await storage.set(patch);
       setStatus('恢复成功，页面即将刷新以载入完整资料。');
       window.setTimeout(() => window.location.reload(), 250);
@@ -206,6 +224,8 @@
       setStatus(`GitHub 恢复失败：${error.message}`, true);
     } finally {
       restore.disabled = false;
+      restore.setAttribute('aria-busy', 'false');
+      status.setAttribute('aria-busy', 'false');
     }
   }
 

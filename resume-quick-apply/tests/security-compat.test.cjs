@@ -125,6 +125,10 @@ test('GitHub sync preserves refreshed token metadata and reports backup freshnes
   assert.match(sync, /'githubGistId', 'githubBackupAt'\]\)\.then\(async stored/);
   assert.match(sync, /备份已超过 24 小时未更新/);
   assert.match(sync, /最近备份：\$\{savedAt\}/);
+  assert.match(sync, /status\.setAttribute\('aria-busy', String\(busy\)\)/);
+  assert.match(sync, /正在保存 GitHub 私有备份/);
+  assert.match(sync, /正在读取 GitHub 私有备份/);
+  assert.match(sync, /等待 GitHub 授权确认/);
 });
 
 test('dashboard exposes a disabled button affordance and keeps profile toasts out of backup actions', () => {
