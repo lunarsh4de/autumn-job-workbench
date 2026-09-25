@@ -508,7 +508,7 @@
   let submissionObserver = null;
   let submissionTimer = null;
   let submissionBaseline = new Map();
-  const successPattern = /投递成功|申请成功|提交成功|成功提交|已成功投递|感谢(?:您|你的)?(?:申请|投递)|application (?:has been )?submitted|successfully applied/i;
+  const successPattern = /投递成功|申请成功|提交成功|成功提交|已成功投递|投递完成|申请已提交|已完成申请|感谢(?:您|你的)?(?:申请|投递)|thank you for (?:applying|your application)|application (?:has been )?(?:submitted|received)|(?:submission|application) successful|successfully applied/i;
   function successCandidates() {
     const doc = window.document;
     if (!doc?.querySelectorAll) return [];

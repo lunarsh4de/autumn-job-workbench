@@ -207,6 +207,19 @@ test('submission is recorded only after a visible success result appears', async
   assert.equal(h.data.applications[0].resumeProfileLabel, '产品经理版');
 });
 
+test('common foreign ATS confirmation text is recorded automatically', async t => {
+  const h = content(t, '<main><h1>Data Analyst</h1><form><button type="submit">Submit application</button></form></main>', {}, 'https://jobs.example.test/apply');
+  h.document.querySelector('form').dispatchEvent(new h.w.Event('submit', { bubbles: true, cancelable: true }));
+  const status = h.document.createElement('div');
+  status.setAttribute('role', 'status');
+  status.textContent = 'Your application has been received. Thank you for applying.';
+  h.document.querySelector('main').append(status);
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(h.data.applications.length, 1);
+  assert.equal(h.data.applications[0].status, 'submitted');
+  assert.equal(h.data.applications[0].source, 'auto');
+});
+
 test('company identity ignores generic Moka metadata and normalizes DJI career hosts', async t => {
   const h = content(t, '<head><meta property="og:site_name" content=" Moka "><meta name="application-name" content="   "></head><main><h1>产品设计师</h1><form><button type="submit">提交申请</button></form></main>', {}, 'https://apply.careers.dji.com/campus/apply');
   h.document.querySelector('form').dispatchEvent(new h.w.Event('submit', { bubbles: true, cancelable: true }));
