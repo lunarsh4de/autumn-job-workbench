@@ -349,6 +349,11 @@ dialog::backdrop { background: rgb(18 28 33 / 43%); backdrop-filter: blur(2px); 
 .form-grid textarea { resize: vertical; }
 .dialog-actions { display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; padding-top: 14px; border-top: 1px solid var(--line); }
 
+@media (min-width: 1051px) and (max-width: 1400px) {
+  .catalog-filters { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .catalog-search, .catalog-filter-input { grid-column: span 2; }
+}
+
 @media (max-width: 1050px) {
   .sidebar { width: 76px; }
   .workspace-brand { justify-content: center; padding: 16px 10px; }
