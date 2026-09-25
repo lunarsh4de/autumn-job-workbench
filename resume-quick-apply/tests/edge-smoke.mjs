@@ -175,6 +175,15 @@ try {
   if (dashboard.result.value.title !== '秋招工作台' || dashboard.result.value.metrics !== 4 || dashboard.result.value.recent < 1 || dashboard.result.value.overflow) {
     throw new Error(`Dashboard desktop smoke test failed: ${JSON.stringify(dashboard.result.value)}`);
   }
+  await client.send('Emulation.setDeviceMetricsOverride', { width: 820, height: 900, deviceScaleFactor: 1, mobile: false });
+  await wait(250);
+  const tablet = await client.send('Runtime.evaluate', {
+    expression: `(()=>({overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,iconOnly:getComputedStyle(document.querySelector('.nav-item span')).display==='none',labels:[...document.querySelectorAll('.nav-item')].every(item=>item.getAttribute('aria-label')&&item.title)}))()`,
+    returnByValue: true
+  });
+  if (tablet.result.value.overflow || !tablet.result.value.iconOnly || !tablet.result.value.labels) throw new Error(`Dashboard tablet smoke test failed: ${JSON.stringify(tablet.result.value)}`);
+  await client.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  await wait(150);
   const desktopShot = await client.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
   const desktopPath = join(screenshotRoot, 'dashboard-desktop.png');
   writeFileSync(desktopPath, Buffer.from(desktopShot.data, 'base64'));
