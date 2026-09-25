@@ -142,6 +142,32 @@
     if (message) flash(message);
   }
 
+  async function enrichCatalogMetadata(items) {
+    if (!globalThis.CatalogDB?.getAll) return { items, changed: false };
+    let catalog;
+    try { catalog = await CatalogDB.getAll(); } catch { return { items, changed: false }; }
+    const byUrl = new Map(catalog.filter(item => item?.url).map(item => [item.url, item]));
+    let changed = false;
+    const fields = ['location', 'companyType', 'jobType', 'platform', 'salary', 'deadline', 'notes'];
+    const enriched = items.map(entry => {
+      const match = byUrl.get(entry.url);
+      if (!match) return entry;
+      const next = { ...entry };
+      let entryChanged = false;
+      for (const field of fields) {
+        if (!next[field] && match[field]) {
+          next[field] = match[field];
+          entryChanged = true;
+        }
+      }
+      if (next.title === '未命名岗位' && match.title) { next.title = match.title; entryChanged = true; }
+      if (next.company === '未知公司' && match.company) { next.company = match.company; entryChanged = true; }
+      if (entryChanged) changed = true;
+      return entryChanged ? TD.item(next) : entry;
+    });
+    return { items: enriched, changed };
+  }
+
   function renderAll() {
     const summary = TD.summary(state.items);
     document.querySelector('#nav-active-count').textContent = String(summary.active);
@@ -707,10 +733,11 @@
     const saved = await storage.get(['jobTrackerItems', 'applications', 'resumeProfiles', 'activeProfileId', 'activeProfileLabel', 'profile', 'experiences']);
     setResumeSyncStatus(saved);
     const merged = TD.mergeApplications(saved.jobTrackerItems, saved.applications);
-    state.items = merged.items;
-    if (merged.added || merged.updated || !Array.isArray(saved.jobTrackerItems)) await storage.set({ jobTrackerItems: state.items });
+    const enriched = await enrichCatalogMetadata(merged.items);
+    state.items = enriched.items;
+    if (merged.added || merged.updated || enriched.changed || !Array.isArray(saved.jobTrackerItems)) await storage.set({ jobTrackerItems: state.items });
     renderAll();
-    if (merged.added || merged.updated) flash(`已从插件同步 ${merged.added ? `${merged.added} 个新岗位` : ''}${merged.added && merged.updated ? '，' : ''}${merged.updated ? `${merged.updated} 个岗位状态` : ''}。`);
+    if (merged.added || merged.updated || enriched.changed) flash(`已从插件同步 ${merged.added ? `${merged.added} 个新岗位` : ''}${merged.added && merged.updated ? '，' : ''}${merged.updated ? `${merged.updated} 个岗位状态` : ''}${enriched.changed ? '，并补充岗位库分类' : ''}。`);
   }
 
   populateStages();
@@ -731,10 +758,14 @@
       const resumeKeys = ['resumeProfiles', 'activeProfileId', 'activeProfileLabel', 'profile', 'experiences'];
       if (resumeKeys.some(key => changes[key])) storage.get(resumeKeys).then(setResumeSyncStatus).catch(() => {});
       if (!changes.applications) return;
-      const merged = TD.mergeApplications(state.items, changes.applications.newValue);
-      if (!merged.added && !merged.updated) return;
-      state.items = merged.items;
-      persist(`已同步${merged.added ? ` ${merged.added} 个新岗位` : ''}${merged.added && merged.updated ? '，' : ''}${merged.updated ? ` ${merged.updated} 个岗位状态` : ''}。`).then(renderAll).catch(error => flash(error.message, true));
+      (async () => {
+        const merged = TD.mergeApplications(state.items, changes.applications.newValue);
+        const enriched = await enrichCatalogMetadata(merged.items);
+        if (!merged.added && !merged.updated && !enriched.changed) return;
+        state.items = enriched.items;
+        await persist(`已同步${merged.added ? ` ${merged.added} 个新岗位` : ''}${merged.added && merged.updated ? '，' : ''}${merged.updated ? ` ${merged.updated} 个岗位状态` : ''}${enriched.changed ? '，并补充岗位库分类' : ''}。`);
+        renderAll();
+      })().catch(error => flash(error.message, true));
     });
   }
 })();

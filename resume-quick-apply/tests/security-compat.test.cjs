@@ -186,6 +186,14 @@ test('kanban cards expose a touch and keyboard stage control', () => {
   assert.match(css, /\.job-stage-control/);
 });
 
+test('automatic application sync enriches new cards from the local catalog', () => {
+  const dashboard = source('dashboard.js');
+  assert.match(dashboard, /async function enrichCatalogMetadata/);
+  assert.match(dashboard, /CatalogDB\.getAll\(\)/);
+  assert.match(dashboard, /并补充岗位库分类/);
+  assert.match(dashboard, /changes\.applications\.newValue/);
+});
+
 test('catalog empty results offer a direct filter reset action', () => {
   const catalog = source('catalog.js');
   assert.match(catalog, /data-reset-catalog/);

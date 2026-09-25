@@ -205,6 +205,14 @@ try {
   await client.send('Runtime.evaluate', { expression: `document.querySelector('#catalog-table [data-catalog-track]')?.click()` });
   const trackedMetadata = await waitForEvaluation(client, `(() => { const card=document.querySelector('#kanban .job-card'); return !document.querySelector('#view-board').hidden && card ? {text:card.textContent, companyType:card.textContent.includes('外企（中国大陆）'), jobType:card.textContent.includes('数据算法'), platform:card.textContent.includes('公开清单'), source:card.textContent.includes('岗位库')} : null; })()`);
   if (!trackedMetadata.companyType || !trackedMetadata.jobType || !trackedMetadata.platform || !trackedMetadata.source) throw new Error(`Catalog tracking metadata smoke test failed: ${JSON.stringify(trackedMetadata)}`);
+  const autoSyncSeed = await client.send('Runtime.evaluate', {
+    expression: `(async()=>{const job={id:'auto-sync-fixture',url:'https://jobs.example.test/auto-sync',title:'自动同步测试岗位',company:'自动同步科技',location:'上海',companyType:'外企（中国大陆）',jobType:'用户研究',platform:'公开清单',importedAt:Date.now(),tags:[]};await globalThis.CatalogDB.putMany([job]);window.__autoSyncExpected={title:job.title,jobType:job.jobType,platform:job.platform};await chrome.storage.local.set({applications:[{url:job.url,title:job.title,company:job.company,createdAt:Date.now(),status:'submitted',source:'auto'}]});return {skipped:false,title:job.title};})()`,
+    awaitPromise: true,
+    returnByValue: true
+  });
+  if (autoSyncSeed.result.value?.skipped) throw new Error('Automatic application sync smoke test could not find an untracked catalog item.');
+  const autoSyncCard = await waitForEvaluation(client, `(()=>{const expected=window.__autoSyncExpected;const card=[...document.querySelectorAll('#kanban .job-card')].find(item=>expected&&item.textContent.includes(expected.title)&&item.textContent.includes('插件同步'));return card?{text:card.textContent,jobType:!expected.jobType||card.textContent.includes(expected.jobType),platform:!expected.platform||card.textContent.includes(expected.platform)}:null;})()`);
+  if (!autoSyncCard.jobType || !autoSyncCard.platform) throw new Error(`Automatic application catalog enrichment failed: ${JSON.stringify(autoSyncCard)}`);
   const stageControl = await client.send('Runtime.evaluate', {
     expression: `(()=>{const card=document.querySelector('#kanban .job-card');const control=card?.querySelector('[data-stage-for]');if(!control)return null;control.value='preparing';control.dispatchEvent(new Event('change',{bubbles:true}));return {options:control.options.length,label:control.getAttribute('aria-label')};})()`,
     returnByValue: true
