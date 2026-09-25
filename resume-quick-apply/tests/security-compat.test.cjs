@@ -222,6 +222,14 @@ test('catalog source health exposes partial failures in visible status markup', 
   assert.match(css, /\.public-sync-detail/);
 });
 
+test('catalog sync errors avoid repeating the same banner message', () => {
+  const catalog = source('catalog.js');
+  const dashboard = source('dashboard.html');
+  assert.match(catalog, /usefulDetail = rawDetail && !\/failed to fetch\|network\|load failed\|fetch\/i/);
+  assert.match(dashboard, /id="public-sync-status" role="status" aria-live="polite"/);
+  assert.match(dashboard, /id="resume-sync-status" role="status" aria-live="polite"/);
+});
+
 test('catalog tracking controls reflect existing application-board records', () => {
   const catalog = source('catalog.js');
   assert.match(catalog, /function isTracked\(job\)/);

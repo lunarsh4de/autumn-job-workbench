@@ -140,8 +140,9 @@ try {
   });
   if (!recentKeyboard.result.value.opened || !recentKeyboard.result.value.focusable || recentKeyboard.result.value.role !== 'button') throw new Error(`Recent job keyboard smoke test failed: ${JSON.stringify(recentKeyboard.result.value)}`);
   await client.send('Runtime.evaluate', { expression: `globalThis.JobTrackerDashboard.showView('catalog')` });
-  const publicStatus = await waitForEvaluation(client, `(() => { const node=document.querySelector('#public-sync-status'); const button=document.querySelector('#sync-public-catalog'); return node && node.dataset.state !== 'loading' ? {state:node.dataset.state,text:node.textContent,title:node.title,syncButtonEnabled:!button.disabled} : null; })()`);
+  const publicStatus = await waitForEvaluation(client, `(() => { const node=document.querySelector('#public-sync-status'); const detail=document.querySelector('#public-sync-detail'); const button=document.querySelector('#sync-public-catalog'); return node && node.dataset.state !== 'loading' ? {state:node.dataset.state,text:node.textContent,detail:detail?.textContent||'',title:node.title,syncButtonEnabled:!button.disabled} : null; })()`);
   if (!publicStatus || /Failed to fetch|NetworkError|Load failed/i.test(`${publicStatus.text} ${publicStatus.title}`)) throw new Error(`Public source status smoke test failed: ${JSON.stringify(publicStatus)}`);
+  if (publicStatus.state === 'error' && publicStatus.detail === publicStatus.text) throw new Error(`Public source status repeated its error message: ${JSON.stringify(publicStatus)}`);
   if (!publicStatus.syncButtonEnabled || (publicStatus.state === 'ready' && !/来源 \d+\/\d+ 正常/.test(publicStatus.text))) throw new Error(`Public source health status failed: ${JSON.stringify(publicStatus)}`);
   const emptyResumeStatus = await waitForEvaluation(client, `(() => { const node=document.querySelector('#resume-sync-status'); return node?.dataset.state === 'empty' ? node.textContent : null; })()`);
   if (emptyResumeStatus !== '尚未检测到插件简历') throw new Error(`Empty resume status smoke test failed: ${JSON.stringify(emptyResumeStatus)}`);

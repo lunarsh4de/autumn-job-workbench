@@ -399,7 +399,9 @@
       return true;
     } catch (error) {
       const message = publicSyncError(error);
-      setPublicStatus(message, 'error', message);
+      const rawDetail = String(error?.message || '').trim();
+      const usefulDetail = rawDetail && !/failed to fetch|network|load failed|fetch/i.test(rawDetail) && rawDetail !== message ? rawDetail : '';
+      setPublicStatus(message, 'error', usefulDetail);
       if (force) dashboard.flash('公共岗位暂时无法同步，请稍后重试；本地岗位未受影响。', true);
       return false;
     } finally {
