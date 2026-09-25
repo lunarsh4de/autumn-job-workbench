@@ -97,10 +97,11 @@
     const explicit = text(value, 80).toLowerCase();
     const region = regionParts({ location });
     const mainland = region.province !== '其他地区' && !['香港', '澳门', '台湾'].includes(region.province);
-    if ((FOREIGN_COMPANY_TYPES.has(explicit) || explicit.includes('外企') || explicit.includes('外资')) && mainland) return '外企（中国大陆）';
+    const foreign = FOREIGN_COMPANY_TYPES.has(explicit) || explicit.includes('外企') || explicit.includes('外资');
+    if (foreign) return mainland ? '外企（中国大陆）' : '外企（其他地区）';
     if (explicit.includes('国企') || explicit.includes('央企') || explicit.includes('国有') || explicit.includes('事业单位')) return '国企/央企';
     if (/国家电网|南方电网|中国石油|中石油|中国石化|中石化|中国移动|中国联通|中国电信|中国建筑|中建集团|中国中铁|中国铁建|中国交建|中国航天|中国航空|中国兵器|中国烟草|中国铁路|国铁|中核|中航|中粮|中储粮|中国船舶|中国电子|中国华能|国家能源/.test(company)) return '国企/央企';
-    if (!explicit && FOREIGN_COMPANY_PATTERN.test(company) && mainland) return '外企（中国大陆）';
+    if (!explicit && FOREIGN_COMPANY_PATTERN.test(company)) return mainland ? '外企（中国大陆）' : '外企（其他地区）';
     return text(value, 80) || '国内/综合';
   }
 

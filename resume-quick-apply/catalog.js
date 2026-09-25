@@ -127,7 +127,7 @@
     for (const job of list.slice(0, state.visible)) {
       const row = document.createElement('tr');
       const company = element('td', 'catalog-company-cell', job.company);
-      if (job.companyType === '外企（中国大陆）') company.append(element('span', 'company-type-badge', '外企（中国大陆）'));
+      if (job.companyType.startsWith('外企（')) company.append(element('span', 'company-type-badge', job.companyType));
       const titleCell = document.createElement('td');
       const copy = element('div', 'catalog-job-copy');
       copy.append(element('strong', '', job.title));

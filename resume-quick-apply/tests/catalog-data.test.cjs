@@ -73,7 +73,7 @@ test('catalog scores structured province-city fields when location text is empty
 test('catalog infers known foreign employers only for mainland locations', () => {
   assert.equal(C.item({ company: 'Google', title: '软件工程师', location: '上海' }).companyType, '外企（中国大陆）');
   assert.equal(C.item({ company: 'IBM', title: '软件工程师', province: '广东', city: '深圳', location: '' }).companyType, '外企（中国大陆）');
-  assert.equal(C.item({ company: 'Google', title: '软件工程师', location: '新加坡' }).companyType, '国内/综合');
+  assert.equal(C.item({ company: 'Google', title: '软件工程师', location: '新加坡' }).companyType, '外企（其他地区）');
 });
 
 test('catalog classifies explicit and known state-owned employers', () => {

@@ -62,6 +62,10 @@ class RefreshJobsTests(unittest.TestCase):
         job = refresh_jobs.normalize({"company": "国家电网有限公司", "title": "技术研发", "location": "北京"}, {"id": "test", "name": "测试源", "url": "https://example.com"})
         self.assertEqual(job["companyType"], "国企/央企")
 
+    def test_normalize_separates_non_mainland_foreign_employers(self):
+        job = refresh_jobs.normalize({"company": "Google", "title": "软件工程师", "location": "新加坡"}, {"id": "test", "name": "测试源", "url": "https://example.com"})
+        self.assertEqual(job["companyType"], "外企（其他地区）")
+
 
 if __name__ == "__main__":
     unittest.main()

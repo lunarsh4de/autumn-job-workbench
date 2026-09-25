@@ -121,7 +121,7 @@ def normalize(job: dict[str, Any], source: dict[str, Any]) -> dict[str, Any] | N
     explicit_company_type = clean(job.get("companyType"), 40) or clean(source.get("companyType"), 40)
     company_haystack = " ".join((company, " ".join(tags), clean(job.get("description"), 12000)))
     if explicit_company_type and re.search(r"外企|外资|跨国|foreign|mnc", explicit_company_type, re.I):
-        company_type = "外企（中国大陆）" if source.get("mainland_china_only") or is_mainland_location(job.get("location")) else "国内/综合"
+        company_type = "外企（中国大陆）" if source.get("mainland_china_only") or is_mainland_location(job.get("location")) else "外企（其他地区）"
     elif explicit_company_type and re.search(r"国企|央企|国有|事业单位|公共部门", explicit_company_type, re.I):
         company_type = "国企/央企"
     elif explicit_company_type:
@@ -129,7 +129,7 @@ def normalize(job: dict[str, Any], source: dict[str, Any]) -> dict[str, Any] | N
     elif STATE_COMPANY_PATTERN.search(company_haystack):
         company_type = "国企/央企"
     else:
-        company_type = "外企（中国大陆）" if FOREIGN_COMPANY_PATTERN.search(company) and is_mainland_location(job.get("location")) else "国内/综合"
+        company_type = "外企（中国大陆）" if FOREIGN_COMPANY_PATTERN.search(company) and is_mainland_location(job.get("location")) else "外企（其他地区）" if FOREIGN_COMPANY_PATTERN.search(company) else "国内/综合"
     return {
         "id": f"public-{digest}",
         "company": company,
