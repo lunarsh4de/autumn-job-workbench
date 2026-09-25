@@ -35,6 +35,7 @@
   };
   const PROVINCES = ['北京', '上海', '天津', '重庆', '广东', '浙江', '江苏', '四川', '湖北', '湖南', '河南', '陕西', '安徽', '福建', '山东', '辽宁', '黑龙江', '吉林', '江西', '云南', '贵州', '山西', '河北', '新疆', '甘肃', '海南', '广西', '内蒙古', '西藏', '宁夏', '青海', '香港', '澳门', '台湾'];
   const FOREIGN_COMPANY_TYPES = new Set(['外企', '外资', '跨国公司', 'foreign', 'foreign company', 'mnc']);
+  const FOREIGN_COMPANY_PATTERN = /微软|英特尔|英伟达|苹果|亚马逊|谷歌|google|microsoft|amazon|apple|ibm|sap|西门子|博世|联合利华|宝洁|欧莱雅|耐克|阿迪达斯|德勤|普华永道|安永|毕马威|埃森哲|汇丰|渣打|花旗|摩根|可口可乐|百事|星巴克|麦肯锡|波士顿咨询|贝恩|airbnb|stripe|datadog|cloudflare|coinbase/i;
 
   function text(value, max = 2000) {
     return typeof value === 'string' || typeof value === 'number' ? String(value).trim().slice(0, max) : '';
@@ -92,11 +93,14 @@
     }));
   }
 
-  function normalizeCompanyType(value, company = '') {
+  function normalizeCompanyType(value, company = '', location = '') {
     const explicit = text(value, 80).toLowerCase();
-    if (FOREIGN_COMPANY_TYPES.has(explicit) || explicit.includes('外企') || explicit.includes('外资')) return '外企（中国大陆）';
+    const region = regionParts({ location });
+    const mainland = region.province !== '其他地区' && !['香港', '澳门', '台湾'].includes(region.province);
+    if ((FOREIGN_COMPANY_TYPES.has(explicit) || explicit.includes('外企') || explicit.includes('外资')) && mainland) return '外企（中国大陆）';
     if (explicit.includes('国企') || explicit.includes('央企') || explicit.includes('国有') || explicit.includes('事业单位')) return '国企/央企';
     if (/国家电网|南方电网|中国石油|中石油|中国石化|中石化|中国移动|中国联通|中国电信|中国建筑|中建集团|中国中铁|中国铁建|中国交建|中国航天|中国航空|中国兵器|中国烟草|中国铁路|国铁|中核|中航|中粮|中储粮|中国船舶|中国电子|中国华能|国家能源/.test(company)) return '国企/央企';
+    if (!explicit && FOREIGN_COMPANY_PATTERN.test(company) && mainland) return '外企（中国大陆）';
     return text(value, 80) || '国内/综合';
   }
 
@@ -123,7 +127,7 @@
       location,
       url,
       platform,
-      companyType: normalizeCompanyType(row.companyType || value.companyType, company),
+      companyType: normalizeCompanyType(row.companyType || value.companyType, company, location || `${region.province} ${region.city}`),
       province: region.province,
       city: region.city,
       jobType: classifyJobType({ ...value, ...row, title, tags, description: row.description || value.description }),
@@ -216,7 +220,7 @@
     const tokens = preferenceTokens(preferences);
     if (!tokens.roles.length && !tokens.skills.length && !tokens.cities.length) return null;
     const title = value.title.toLowerCase();
-    const location = value.location.toLowerCase();
+    const location = [value.location, value.province, value.city].filter(Boolean).join(' ').toLowerCase();
     const haystack = `${title} ${value.company} ${value.tags.join(' ')} ${value.description}`.toLowerCase();
     const roleHits = tokens.roles.filter(token => title.includes(token)).length;
     const skillHits = tokens.skills.filter(token => haystack.includes(token)).length;
