@@ -153,6 +153,13 @@ test('catalog import exposes an in-dialog error state and prevents concurrent su
   assert.match(css, /\.import-result\[data-error="true"\]/);
 });
 
+test('catalog empty results offer a direct filter reset action', () => {
+  const catalog = source('catalog.js');
+  assert.match(catalog, /data-reset-catalog/);
+  assert.match(catalog, /没有符合当前筛选的岗位/);
+  assert.match(catalog, /resetFilters\(\)/);
+});
+
 test('resume parsers are self-hosted with licenses and no remote script tags', () => {
   const path = require('node:path');
   const root = path.join(__dirname, '..', 'vendor');

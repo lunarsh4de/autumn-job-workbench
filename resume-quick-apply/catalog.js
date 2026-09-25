@@ -122,7 +122,16 @@
       const row = document.createElement('tr');
       const cell = document.createElement('td');
       cell.colSpan = 6;
-      cell.append(element('div', 'empty-state', state.items.length ? '没有符合当前筛选的岗位' : '岗位库为空，先导入 CSV 或 JSON'));
+      const empty = element('div', 'empty-state');
+      empty.append(element('p', '', state.items.length ? '没有符合当前筛选的岗位' : '岗位库为空，先导入 CSV 或 JSON'));
+      const hasFilter = Boolean(state.query || state.companyQuery || state.province !== 'all' || state.city !== 'all' || state.jobType !== 'all' || state.companyType !== 'all' || state.platform !== 'all' || state.score !== 'all');
+      if (state.items.length && hasFilter) {
+        const clear = element('button', 'button compact secondary', '清除筛选');
+        clear.type = 'button';
+        clear.dataset.resetCatalog = 'true';
+        empty.append(clear);
+      }
+      cell.append(empty);
       row.append(cell);
       root.append(row);
     }
@@ -430,6 +439,11 @@
     });
     document.querySelector('#catalog-detail-close').addEventListener('click', () => document.querySelector('#catalog-detail-dialog').close());
     document.body.addEventListener('click', event => {
+      const reset = event.target.closest('[data-reset-catalog]');
+      if (reset) {
+        resetFilters();
+        return;
+      }
       const details = event.target.closest('[data-catalog-details]');
       if (details) {
         const job = state.items.find(item => item.id === details.dataset.catalogDetails);

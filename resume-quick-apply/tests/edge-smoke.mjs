@@ -152,16 +152,24 @@ try {
       search.value='外企（中国大陆）';
       search.dispatchEvent(new Event('input',{bubbles:true}));
       const searchResult=document.querySelector('#catalog-result-count').textContent;
+      search.value='__no_such_job__';
+      search.dispatchEvent(new Event('input',{bubbles:true}));
+      const noMatch={result:document.querySelector('#catalog-result-count').textContent,reset:!!document.querySelector('#catalog-table [data-reset-catalog]')};
+      document.querySelector('#catalog-table [data-reset-catalog]')?.click();
       search.value='';
       search.dispatchEvent(new Event('input',{bubbles:true}));
-      return {companyInput:company.type==='search',hasAllCompanySelect,cityOptions,result:document.querySelector('#catalog-result-count').textContent,searchResult};
+      return {companyInput:company.type==='search',hasAllCompanySelect,cityOptions,result:document.querySelector('#catalog-result-count').textContent,searchResult,noMatch,afterClear:document.querySelector('#catalog-result-count').textContent};
     })()`,
     returnByValue: true
   });
   const filterValue = catalogFilters.result.value;
-  if (!filterValue.companyInput || filterValue.hasAllCompanySelect || !filterValue.cityOptions.includes('上海') || filterValue.result !== '1 个岗位' || filterValue.searchResult !== '1 个岗位') {
+  if (!filterValue.companyInput || filterValue.hasAllCompanySelect || !filterValue.cityOptions.includes('上海') || filterValue.result !== '5 个岗位' || filterValue.searchResult !== '1 个岗位' || filterValue.noMatch.result !== '0 个岗位' || !filterValue.noMatch.reset || filterValue.afterClear !== '5 个岗位') {
     throw new Error(`Catalog filter smoke test failed: ${JSON.stringify(filterValue)}`);
   }
+  await client.send('Runtime.evaluate', {
+    expression: `(()=>{const company=document.querySelector('#catalog-company');company.value='示例';company.dispatchEvent(new Event('input',{bubbles:true}));const search=document.querySelector('#catalog-search');search.value='外企（中国大陆）';search.dispatchEvent(new Event('input',{bubbles:true}));})()`
+  });
+  await waitForEvaluation(client, `document.querySelector('#catalog-result-count')?.textContent === '1 个岗位'`);
   await client.send('Runtime.evaluate', {
     expression: `(()=>{document.querySelector('#open-import').click();const input=document.querySelector('#catalog-paste');input.value='这不是有效岗位数据';document.querySelector('#import-form').requestSubmit();})()`
   });
