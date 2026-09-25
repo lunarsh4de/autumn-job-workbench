@@ -143,12 +143,18 @@ try {
       const cityOptions=[...city.options].map(option=>option.textContent);
       company.value='示例';
       company.dispatchEvent(new Event('input',{bubbles:true}));
-      return {companyInput:company.type==='search',hasAllCompanySelect,cityOptions,result:document.querySelector('#catalog-result-count').textContent};
+      const search=document.querySelector('#catalog-search');
+      search.value='外企（中国大陆）';
+      search.dispatchEvent(new Event('input',{bubbles:true}));
+      const searchResult=document.querySelector('#catalog-result-count').textContent;
+      search.value='';
+      search.dispatchEvent(new Event('input',{bubbles:true}));
+      return {companyInput:company.type==='search',hasAllCompanySelect,cityOptions,result:document.querySelector('#catalog-result-count').textContent,searchResult};
     })()`,
     returnByValue: true
   });
   const filterValue = catalogFilters.result.value;
-  if (!filterValue.companyInput || filterValue.hasAllCompanySelect || !filterValue.cityOptions.includes('上海') || filterValue.result !== '1 个岗位') {
+  if (!filterValue.companyInput || filterValue.hasAllCompanySelect || !filterValue.cityOptions.includes('上海') || filterValue.result !== '1 个岗位' || filterValue.searchResult !== '1 个岗位') {
     throw new Error(`Catalog filter smoke test failed: ${JSON.stringify(filterValue)}`);
   }
   await client.send('Runtime.evaluate', { expression: `document.querySelector('#catalog-table [data-catalog-track]')?.click()` });

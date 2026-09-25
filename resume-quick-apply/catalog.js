@@ -39,7 +39,7 @@
   function filteredItems() {
     const query = state.query.toLowerCase();
     const list = state.items.filter(job => {
-      if (query && !`${job.company} ${job.title} ${job.location} ${job.platform} ${job.jobType} ${job.tags.join(' ')}`.toLowerCase().includes(query)) return false;
+      if (query && !`${job.company} ${job.title} ${job.location} ${job.province} ${job.city} ${job.platform} ${job.companyType} ${job.jobType} ${job.tags.join(' ')}`.toLowerCase().includes(query)) return false;
       if (state.companyQuery && !job.company.toLowerCase().includes(state.companyQuery.toLowerCase())) return false;
       if (state.province !== 'all' && job.province !== state.province) return false;
       if (state.city !== 'all' && job.city !== state.city) return false;
