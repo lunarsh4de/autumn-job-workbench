@@ -413,6 +413,7 @@
   function setSidebarOpen(open) {
     const sidebar = document.querySelector('#sidebar');
     const toggle = document.querySelector('#mobile-menu');
+    const backdrop = document.querySelector('#sidebar-backdrop');
     if (!sidebar) return;
     const isOpen = Boolean(open);
     sidebar.classList.toggle('open', isOpen);
@@ -420,6 +421,10 @@
       toggle.setAttribute('aria-expanded', String(isOpen));
       toggle.setAttribute('aria-label', isOpen ? '关闭导航' : '打开导航');
       toggle.title = isOpen ? '关闭导航' : '打开导航';
+    }
+    if (backdrop) {
+      backdrop.hidden = !isOpen;
+      backdrop.setAttribute('aria-hidden', String(!isOpen));
     }
   }
 
@@ -555,6 +560,10 @@
     const mobileMenu = document.querySelector('#mobile-menu');
     const sidebar = document.querySelector('#sidebar');
     mobileMenu.addEventListener('click', () => setSidebarOpen(!sidebar.classList.contains('open')));
+    document.querySelector('#sidebar-backdrop')?.addEventListener('click', () => {
+      setSidebarOpen(false);
+      mobileMenu.focus();
+    });
     document.addEventListener('keydown', event => {
       if (event.key !== 'Escape' || !sidebar.classList.contains('open')) return;
       setSidebarOpen(false);
