@@ -132,6 +132,14 @@ try {
     returnByValue: true
   });
   if (!editorFocus.result.value.opened || !editorFocus.result.value.restored) throw new Error(`Job editor focus smoke test failed: ${JSON.stringify(editorFocus.result.value)}`);
+  await client.send('Runtime.evaluate', { expression: `globalThis.JobTrackerDashboard.showView('overview')` });
+  const recentKeyboard = await client.send('Runtime.evaluate', {
+    expression: `(async()=>{const trigger=document.querySelector('.recent-item');trigger?.focus();trigger?.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));const opened=document.querySelector('#job-dialog')?.open && document.activeElement?.name==='company';document.querySelector('#cancel-dialog')?.click();await new Promise(resolve=>setTimeout(resolve,50));return {opened,focusable:trigger?.tabIndex===0,role:trigger?.getAttribute('role')};})()`,
+    awaitPromise: true,
+    returnByValue: true
+  });
+  if (!recentKeyboard.result.value.opened || !recentKeyboard.result.value.focusable || recentKeyboard.result.value.role !== 'button') throw new Error(`Recent job keyboard smoke test failed: ${JSON.stringify(recentKeyboard.result.value)}`);
+  await client.send('Runtime.evaluate', { expression: `globalThis.JobTrackerDashboard.showView('catalog')` });
   const publicStatus = await waitForEvaluation(client, `(() => { const node=document.querySelector('#public-sync-status'); const button=document.querySelector('#sync-public-catalog'); return node && node.dataset.state !== 'loading' ? {state:node.dataset.state,text:node.textContent,title:node.title,syncButtonEnabled:!button.disabled} : null; })()`);
   if (!publicStatus || /Failed to fetch|NetworkError|Load failed/i.test(`${publicStatus.text} ${publicStatus.title}`)) throw new Error(`Public source status smoke test failed: ${JSON.stringify(publicStatus)}`);
   if (!publicStatus.syncButtonEnabled || (publicStatus.state === 'ready' && !/来源 \d+\/\d+ 正常/.test(publicStatus.text))) throw new Error(`Public source health status failed: ${JSON.stringify(publicStatus)}`);

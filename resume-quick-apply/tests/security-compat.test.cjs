@@ -168,6 +168,15 @@ test('job and catalog import dialogs restore focus to their launch controls', ()
   assert.match(catalog, /scheduleImportFocusRestore/);
 });
 
+test('recent dashboard jobs expose keyboard edit semantics', () => {
+  const dashboard = source('dashboard.js');
+  assert.match(dashboard, /row\.tabIndex = 0/);
+  assert.match(dashboard, /role', 'button'/);
+  assert.match(dashboard, /编辑 \$\{entry\.company\} \$\{entry\.title\}/);
+  assert.match(dashboard, /\[data-edit-id\]\[role="button"\]/);
+  assert.match(dashboard, /event\.key !== 'Enter' && event\.key !== ' '/);
+});
+
 test('catalog empty results offer a direct filter reset action', () => {
   const catalog = source('catalog.js');
   assert.match(catalog, /data-reset-catalog/);

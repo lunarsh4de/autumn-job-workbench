@@ -231,6 +231,9 @@
       copy.append(element('strong', '', entry.title), element('small', '', `${entry.company}${entry.location ? ` · ${entry.location}` : ''}`));
       row.append(copy, stageBadge(entry.stage));
       row.dataset.editId = entry.id;
+      row.tabIndex = 0;
+      row.setAttribute('role', 'button');
+      row.setAttribute('aria-label', `编辑 ${entry.company} ${entry.title}`);
       row.title = '点击编辑岗位';
       root.append(row);
     }
@@ -621,6 +624,14 @@
     document.body.addEventListener('click', event => {
       const target = event.target.closest('[data-edit-id]');
       if (!target) return;
+      const entry = state.items.find(item => item.id === target.dataset.editId);
+      if (entry) openEditor(entry, target);
+    });
+    document.body.addEventListener('keydown', event => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      const target = event.target.closest('[data-edit-id][role="button"]');
+      if (!target) return;
+      event.preventDefault();
       const entry = state.items.find(item => item.id === target.dataset.editId);
       if (entry) openEditor(entry, target);
     });
