@@ -231,6 +231,15 @@ tbody tr:last-child td { border-bottom: 0; }
 .catalog-filter-head > span { color: var(--muted); font-size: 10px; }
 .catalog-filters { display: grid; grid-template-columns: minmax(210px, 1.45fr) minmax(170px, 1fr) repeat(7, minmax(88px, 1fr)) auto; gap: 7px; padding: 0 16px 14px; }
 .catalog-filters select { min-width: 0; height: 34px; min-height: 34px; padding: 6px 7px; font-size: 11px; }
+.filter-fold { min-width: 0; border: 1px solid var(--line-strong); border-radius: 5px; background: #fff; }
+.filter-fold summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 34px; padding: 0 9px; color: #4f5d66; cursor: pointer; font-size: 11px; font-weight: 650; list-style: none; }
+.filter-fold summary::-webkit-details-marker { display: none; }
+.filter-fold summary::after { content: '+'; color: var(--muted); font-size: 14px; font-weight: 400; }
+.filter-fold[open] summary::after { content: '−'; }
+.filter-fold summary span { overflow: hidden; color: var(--muted); font-size: 10px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
+.filter-fold-body { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; padding: 0 8px 8px; }
+.filter-fold-body label { display: grid; gap: 3px; color: var(--muted); font-size: 9px; font-weight: 650; }
+.filter-fold-body select { height: 30px; min-height: 30px; padding: 5px; font-size: 10px; }
 .catalog-search, .catalog-filter-input { display: flex; align-items: center; gap: 6px; min-width: 0; height: 34px; border: 1px solid var(--line-strong); border-radius: 5px; padding: 0 8px; }
 .catalog-search:focus-within, .catalog-filter-input:focus-within { border-color: #67a3db; box-shadow: 0 0 0 2px #deedfa; }
 .catalog-search img, .catalog-filter-input img { width: 14px; height: 14px; opacity: .6; }
@@ -263,6 +272,23 @@ tbody tr:last-child td { border-bottom: 0; }
 .acquisition-steps strong { font-size: 12px; }
 .acquisition-steps p { margin-top: 2px; color: var(--muted); font-size: 10px; }
 .source-directory { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 12px; margin-top: 12px; }
+.dashboard-resume-panel { margin-top: 12px; }
+.dashboard-resume-actions { display: flex; align-items: center; gap: 10px; margin-top: 13px; }
+.resume-upload-label { display: flex; align-items: center; gap: 9px; flex: 1; border: 1px dashed #aabac0; border-radius: 6px; padding: 11px 12px; background: #f8fafb; cursor: pointer; }
+.resume-upload-label:hover { border-color: var(--accent); background: #f2f9f7; }
+.resume-upload-label input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.resume-upload-label img { width: 20px; height: 20px; filter: invert(38%) sepia(52%) saturate(957%) hue-rotate(128deg); }
+.resume-upload-label span { display: grid; gap: 2px; }
+.resume-upload-label strong { font-size: 12px; }
+.resume-upload-label small { color: var(--muted); font-size: 10px; }
+.dashboard-resume-status { margin-top: 9px; color: var(--muted); font-size: 11px; }
+.dashboard-resume-preview { margin-top: 8px; border-radius: 5px; padding: 8px 10px; background: #edf7f5; color: #3e6d67; font-size: 11px; }
+.dashboard-resume-preview[hidden] { display: none; }
+.github-backup-panel { margin-top: 12px; }
+.github-backup-copy { margin-top: 8px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.github-backup-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.github-backup-status { margin-top: 8px; color: var(--muted); font-size: 11px; }
+.github-backup-status[data-error="true"] { color: var(--danger); }
 .source-card { display: grid; align-content: start; min-height: 158px; border: 1px solid var(--line); border-radius: 7px; padding: 14px; background: #fff; box-shadow: var(--shadow); }
 .source-kind { width: fit-content; border-radius: 4px; padding: 3px 6px; background: #eef3f4; color: var(--accent-dark); font-size: 10px; font-weight: 700; }
 .source-card h3 { margin-top: 10px; font-size: 13px; }
@@ -371,6 +397,8 @@ dialog::backdrop { background: rgb(18 28 33 / 43%); backdrop-filter: blur(2px); 
   .catalog-search { grid-column: auto; }
   .catalog-row-actions { min-width: 145px; flex-wrap: wrap; }
   .match-strip { grid-template-columns: 1fr; gap: 8px; }
+  .dashboard-resume-actions { align-items: stretch; flex-direction: column; }
+  .github-backup-actions { align-items: stretch; flex-direction: column; }
   .catalog-actions { width: 100%; }
   .catalog-actions .button { flex: 1; }
 }

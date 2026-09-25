@@ -62,9 +62,8 @@
             <div class="catalog-filters">
               <label class="catalog-search"><img src="icons/search.svg" alt="" /><input id="catalog-search" type="search" placeholder="搜索公司、岗位、地点或标签" /></label>
               <label class="catalog-filter-input"><img src="icons/building-2.svg" alt="" /><input id="catalog-company" type="search" placeholder="筛选公司（输入关键字）" aria-label="筛选公司" /></label>
-              <select id="catalog-province" aria-label="按省份筛选"><option value="all">全部省份</option></select>
-              <select id="catalog-city" aria-label="按城市筛选"><option value="all">全部城市</option></select>
-              <select id="catalog-type" aria-label="筛选岗位类型"><option value="all">全部岗位类型</option></select>
+              <details class="filter-fold" id="catalog-region-fold"><summary>工作地区 <span id="catalog-region-summary">不限</span></summary><div class="filter-fold-body"><label>省份<select id="catalog-province" aria-label="按省份筛选"><option value="all">全部省份</option></select></label><label>城市<select id="catalog-city" aria-label="按城市筛选"><option value="all">全部城市</option></select></label></div></details>
+              <details class="filter-fold" id="catalog-job-fold"><summary>岗位分类 <span id="catalog-job-summary">不限</span></summary><div class="filter-fold-body"><label>岗位类型<select id="catalog-type" aria-label="筛选岗位类型"><option value="all">全部岗位类型</option></select></label></div></details>
               <select id="catalog-company-type" aria-label="筛选企业类型"><option value="all">全部企业类型</option></select>
               <select id="catalog-platform" aria-label="筛选平台"><option value="all">全部平台</option></select>
               <select id="catalog-score" aria-label="筛选匹配分"><option value="all">不限分数</option><option value="high">70 分以上</option><option value="medium">40–69 分</option><option value="low">低于 40 分</option></select>
@@ -144,6 +143,8 @@
             <section class="panel preference-panel"><div class="panel-head"><div><p class="eyebrow">LOCAL MATCHING</p><h3>本地匹配偏好</h3></div><span class="panel-meta">仅保存在本机</span></div><form id="preference-form" class="preference-form"><label>目标岗位<input name="roles" placeholder="产品经理，用户研究，数据分析" /></label><label>技能关键词<textarea name="skills" rows="3" placeholder="SQL，Python，Figma，用户访谈"></textarea></label><label>意向城市<input name="cities" placeholder="北京，上海，深圳" /></label><button class="button primary" type="submit"><img src="icons/save.svg" alt="" />保存并重新评分</button></form></section>
             <section class="panel acquisition-panel"><div class="panel-head"><div><p class="eyebrow">ACQUISITION</p><h3>大量岗位怎么获取</h3></div></div><div class="acquisition-steps"><article><b>01</b><div><strong>官方校招站与就业平台</strong><p>可信度最高，适合浏览或导出；插件可在浏览岗位时收藏。</p></div></article><article><b>02</b><div><strong>公众号、飞书与社区清单</strong><p>将公开表格导出为 CSV，再导入工作台统一去重。</p></div></article><article><b>03</b><div><strong>GitHub Actions 定时整理</strong><p>只处理允许公开转载的数据，生成公共 JSON；个人状态仍留在浏览器。</p></div></article></div></section>
           </div>
+          <section class="panel dashboard-resume-panel"><div class="panel-head"><div><p class="eyebrow">LOCAL RESUME MATCHING</p><h3>上传简历并匹配岗位</h3></div><span class="panel-meta">只在本机解析</span></div><div class="dashboard-resume-actions"><label class="resume-upload-label"><input id="dashboard-resume-file" type="file" accept=".pdf,.docx,.txt,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" /><img src="icons/file-up.svg" alt="" /><span><strong>选择 PDF / DOCX / TXT 简历</strong><small>解析后先预览，确认后更新本地简历档案和岗位评分</small></span></label><button class="button primary" id="dashboard-resume-apply" type="button" disabled><img src="icons/check-circle-2.svg" alt="" />应用解析结果</button></div><p class="dashboard-resume-status" id="dashboard-resume-status">尚未上传简历。</p><div class="dashboard-resume-preview" id="dashboard-resume-preview" hidden></div></section>
+          <section class="panel github-backup-panel"><div class="panel-head"><div><p class="eyebrow">OPTIONAL CLOUD BACKUP</p><h3>用 GitHub 保存个人备份</h3></div><span class="panel-meta">私有 Gist</span></div><p class="github-backup-copy">登录自己的 GitHub 账号后，工作台会把资料、简历档案、投递记录和匹配偏好保存到你的私有 Gist。岗位公共源不会写入个人备份。</p><div class="github-backup-actions"><button class="button secondary" id="github-sign-in" type="button"><img src="icons/external-link.svg" alt="" />登录 GitHub</button><button class="button primary" id="github-save-backup" type="button" disabled><img src="icons/save.svg" alt="" />保存到 GitHub</button><button class="text-link" id="github-sign-out" type="button" hidden>退出</button></div><p class="github-backup-status" id="github-backup-status">尚未连接 GitHub。</p></section>
           <div class="source-directory" id="source-directory">
             <article class="source-card"><span class="source-kind">自动同步</span><h3>秋招情报站公开岗位</h3><p>当前默认 feed，聚合牛客和国聘；Action 每天两次读取并标准化。</p><a class="button secondary" href="https://github.com/SharkT2th/Jobhunter1" target="_blank" rel="noopener noreferrer">查看归属 <img src="icons/external-link.svg" alt="" /></a></article>
             <article class="source-card"><span class="source-kind">国家平台</span><h3>国家大学生就业服务平台</h3><p>高校毕业生招聘、专场双选会和就业服务。</p><a class="button secondary" href="https://www.ncss.cn/" target="_blank" rel="noopener noreferrer">打开来源 <img src="icons/external-link.svg" alt="" /></a></article>
@@ -154,6 +155,7 @@
             <article class="source-card foreign-source"><span class="source-kind">外企（中国大陆）</span><h3>中国大陆外企岗位</h3><p>自动源只保留北京、上海、深圳、杭州等中国大陆地点；香港、新加坡和海外岗位会被排除。</p><a class="button secondary" href="https://github.com/lunarsh4de/autumn-job-workbench/blob/main/job-sources/sources.json" target="_blank" rel="noopener noreferrer">查看自动源 <img src="icons/external-link.svg" alt="" /></a></article>
             <article class="source-card"><span class="source-kind">外企官网</span><h3>英特尔中国招聘</h3><p>用于补充官方岗位浏览；发现岗位后可通过插件投递并同步到工作台。</p><a class="button secondary" href="https://jobs.intel.com/en/search-jobs/China" target="_blank" rel="noopener noreferrer">打开来源 <img src="icons/external-link.svg" alt="" /></a></article>
             <article class="source-card"><span class="source-kind">外企官网</span><h3>汇丰中国招聘</h3><p>中国大陆岗位以官方页面为准，工作台不会绕过登录或验证码。</p><a class="button secondary" href="https://mycareer.hsbc.com/zh_CN/external/SearchJobs" target="_blank" rel="noopener noreferrer">打开来源 <img src="icons/external-link.svg" alt="" /></a></article>
+            <article class="source-card"><span class="source-kind">外企社区</span><h3>LinkedIn 中国大陆岗位</h3><p>适合搜索在华外企、英文岗位和跨国公司团队；登录后按城市与职位筛选，再用插件投递。</p><a class="button secondary" href="https://www.linkedin.com/jobs/search/?location=China" target="_blank" rel="noopener noreferrer">打开 LinkedIn <img src="icons/external-link.svg" alt="" /></a></article>
             <article class="source-card"><span class="source-kind">开源清单</span><h3>GitHub 校招项目</h3><p>适合导入结构化公开清单；使用前检查更新时间和许可证。</p><a class="button secondary" href="https://github.com/search?q=%E6%A0%A1%E6%8B%9B+jobs&type=repositories" target="_blank" rel="noopener noreferrer">搜索项目 <img src="icons/external-link.svg" alt="" /></a></article>
           </div>
         </section>
@@ -208,7 +210,11 @@
     <script src="catalog-data.js"></script>
     <script src="catalog-db.js"></script>
     <script src="dashboard-data.js"></script>
+    <script src="data.js"></script>
+    <script src="resume-parser.js"></script>
+    <script src="vendor/mammoth.browser.min.js"></script>
     <script src="dashboard.js"></script>
+    <script src="github-sync.js"></script>
     <script src="catalog.js"></script>
   </body>
 </html>

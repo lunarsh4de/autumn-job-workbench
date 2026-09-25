@@ -64,3 +64,8 @@ test('catalog normalizes mainland foreign-company labels and derives resume pref
     roles: '数据分析, 产品经理, 用户研究', skills: 'SQL, Python', cities: '北京, 上海, 深圳'
   });
 });
+
+test('catalog classifies explicit and known state-owned employers', () => {
+  assert.equal(C.item({ company: '国家电网有限公司', title: '技术研发', location: '北京' }).companyType, '国企/央企');
+  assert.equal(C.item({ company: '某单位', title: '管培生', location: '上海', companyType: '央企' }).companyType, '国企/央企');
+});

@@ -14,6 +14,8 @@ A local-first job search workspace for individual candidates. It combines public
 - GitHub Actions 定时刷新公开岗位源，GitHub Pages 发布静态工作台。
 - 个人资料、投递阶段、备注和评分偏好只保存在浏览器本地 IndexedDB / `chrome.storage.local`。
 - 插件解析或切换简历档案后，工作台会在本地自动同步活动档案，并用岗位/技能/城市生成自动匹配偏好；手动偏好不会被覆盖。
+- 支持在工作台上传 PDF、DOCX、TXT 简历，先本地解析预览，再更新简历档案和岗位匹配。
+- 扩展工作台支持通过 GitHub OAuth Device Flow 保存到用户自己的私有 Gist；只请求 `gist` 权限，网页版 Pages 保持本地模式。
 
 - Province-to-city filtering and company keyword search.
 - A separate Mainland-China foreign-company filter; Hong Kong, Singapore, and overseas locations are excluded from that view.
@@ -23,6 +25,8 @@ A local-first job search workspace for individual candidates. It combines public
 - Scheduled public-feed refresh through GitHub Actions and static deployment through GitHub Pages.
 - Personal profiles, application stages, notes, and preferences stay in the user's browser.
 - Parsed or switched resume profiles sync locally to the workbench and refresh matching from roles, skills, and cities without overwriting manual preferences.
+- PDF, DOCX, and TXT resumes can be uploaded in the workbench, reviewed locally, and applied to matching.
+- The extension workbench can save a user-approved backup to the user's private GitHub Gist through the OAuth Device Flow with the `gist` scope.
 
 ## 在线使用 Online
 

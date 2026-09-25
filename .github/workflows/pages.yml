@@ -29,7 +29,10 @@ jobs:
           mkdir -p _site/icons
           python scripts/refresh_jobs.py --sources job-sources/sources.json --output _site/jobs.json --allow-partial
           cp resume-quick-apply/dashboard.html _site/index.html
-          cp resume-quick-apply/dashboard.css resume-quick-apply/dashboard.js resume-quick-apply/dashboard-data.js resume-quick-apply/catalog.js resume-quick-apply/catalog-data.js resume-quick-apply/catalog-db.js _site/
+          cp resume-quick-apply/dashboard.css resume-quick-apply/dashboard.js resume-quick-apply/dashboard-data.js resume-quick-apply/github-sync.js resume-quick-apply/catalog.js resume-quick-apply/catalog-data.js resume-quick-apply/catalog-db.js _site/
+          cp resume-quick-apply/data.js resume-quick-apply/resume-parser.js _site/
+          mkdir -p _site/vendor
+          cp resume-quick-apply/vendor/mammoth.browser.min.js resume-quick-apply/vendor/pdf.min.mjs resume-quick-apply/vendor/pdf.worker.min.mjs _site/vendor/
           cp resume-quick-apply/icons/*.svg _site/icons/
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5

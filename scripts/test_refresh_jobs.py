@@ -58,6 +58,10 @@ class RefreshJobsTests(unittest.TestCase):
         normalized = refresh_jobs.normalize(rows[0], source)
         self.assertEqual(normalized["companyType"], "外企（中国大陆）")
 
+    def test_normalize_classifies_known_state_owned_employer(self):
+        job = refresh_jobs.normalize({"company": "国家电网有限公司", "title": "技术研发", "location": "北京"}, {"id": "test", "name": "测试源", "url": "https://example.com"})
+        self.assertEqual(job["companyType"], "国企/央企")
+
 
 if __name__ == "__main__":
     unittest.main()

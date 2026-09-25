@@ -5,6 +5,7 @@
   "description": "从简历分类多类经历，在招聘网站快速填充，并在本地秋招工作台管理岗位进度。",
   "homepage_url": "https://github.com/lunarsh4de",
   "permissions": ["storage", "unlimitedStorage", "activeTab", "scripting", "contextMenus"],
+  "host_permissions": ["https://github.com/*", "https://api.github.com/*"],
   "action": {
     "default_title": "投简历助手",
     "default_popup": "popup.html"

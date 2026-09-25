@@ -9,6 +9,7 @@
     preferences: { roles: '', skills: '', cities: '' },
     query: '', companyQuery: '', province: 'all', city: 'all', jobType: 'all', companyType: 'all', platform: 'all', score: 'all', sort: 'match', visible: 200
   };
+  let resumeCandidate = null;
 
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -86,6 +87,10 @@
     state.jobType = setOptions('#catalog-type', state.items.map(job => job.jobType), '岗位类型');
     state.companyType = setOptions('#catalog-company-type', state.items.map(job => job.companyType), '企业类型');
     state.platform = setOptions('#catalog-platform', state.items.map(job => job.platform), '平台');
+    const regionSummary = document.querySelector('#catalog-region-summary');
+    if (regionSummary) regionSummary.textContent = state.province === 'all' ? '不限' : `${state.province}${state.city === 'all' ? '' : ` · ${state.city}`}`;
+    const jobSummary = document.querySelector('#catalog-job-summary');
+    if (jobSummary) jobSummary.textContent = state.jobType === 'all' ? '不限' : state.jobType;
     renderMatchStrip();
     renderTable();
   }
@@ -296,6 +301,8 @@
     document.querySelector('#catalog-city').value = 'all';
     document.querySelector('#catalog-type').value = 'all';
     document.querySelector('#catalog-company-type').value = 'all';
+    document.querySelector('#catalog-region-summary').textContent = '不限';
+    document.querySelector('#catalog-job-summary').textContent = '不限';
     document.querySelector('#catalog-platform').value = 'all';
     document.querySelector('#catalog-score').value = 'all';
     document.querySelector('#catalog-sort').value = 'match';
@@ -395,7 +402,91 @@
     if (announce && (saved.activeProfileLabel || saved.profile || saved.experiences)) dashboard.flash(`已同步“${saved.activeProfileLabel || '当前'}”简历，岗位匹配分已更新。`);
   }
 
+  async function readPdfText(file) {
+    const pdfjs = await import('./vendor/pdf.min.mjs');
+    pdfjs.GlobalWorkerOptions.workerSrc = './vendor/pdf.worker.min.mjs';
+    const task = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false });
+    const pdf = await task.promise;
+    try {
+      if (pdf.numPages > 40) throw new Error('PDF 超过 40 页，请使用精简版简历。');
+      const pages = [];
+      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+        const page = await pdf.getPage(pageNumber);
+        const content = await page.getTextContent();
+        pages.push(content.items.map(item => item.str + (item.hasEOL ? '\n' : ' ')).join('').trim());
+      }
+      return pages.join('\n\n');
+    } finally { await task.destroy(); }
+  }
+
+  async function readResumeText(file) {
+    if (file.size > 10 * 1024 * 1024) throw new Error('待解析简历超过 10 MB。');
+    const extension = file.name.split('.').pop().toLowerCase();
+    if (extension === 'txt') return file.text();
+    if (extension === 'pdf') return readPdfText(file);
+    if (extension === 'docx') {
+      if (!globalThis.mammoth?.extractRawText) throw new Error('DOCX 解析组件未加载，请刷新页面后重试。');
+      return (await globalThis.mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() })).value;
+    }
+    throw new Error('仅支持 PDF、DOCX 或 TXT 简历。');
+  }
+
+  function resumeSummary(parsed) {
+    const counts = parsed.experiences;
+    return `识别 ${parsed.meta.detectedFields} 项基础资料、${counts.work.length} 段工作、${counts.education.length} 段教育、${counts.projects.length} 段项目及 ${counts.competitions.length + counts.awards.length + counts.campus.length + counts.languages.length + counts.publications.length} 条其他经历。`;
+  }
+
+  async function applyDashboardResume() {
+    if (!resumeCandidate) throw new Error('请先选择并解析简历。');
+    const label = resumeCandidate.fileName.replace(/\.[^.]+$/, '').trim().slice(0, 80) || '网页导入简历';
+    const saved = await dashboard.storage.get(['profile', 'experiences', 'resumeProfiles', 'activeProfileId', 'activeProfileLabel']);
+    const profileValues = Object.fromEntries((globalThis.ResumeData ? ResumeData.fields : Object.keys(resumeCandidate.profile)).map(key => [key, resumeCandidate.profile[key] || saved.profile?.[key] || '']));
+    const profile = globalThis.ResumeData ? ResumeData.profile(profileValues) : profileValues;
+    const experiences = globalThis.ResumeData ? ResumeData.experiences(resumeCandidate.experiences) : resumeCandidate.experiences;
+    const profiles = Array.isArray(saved.resumeProfiles) ? saved.resumeProfiles : [];
+    const activeId = saved.activeProfileId || profiles[0]?.id || '';
+    const active = profiles.find(item => item.id === activeId);
+    const patch = { profile, experiences, activeProfileLabel: label };
+    if (active) {
+      patch.resumeProfiles = profiles.map(item => item.id === active.id ? { ...item, profile, experiences, label: item.label || label, updatedAt: Date.now() } : item);
+      patch.activeProfileId = active.id;
+      patch.activeProfileLabel = active.label || label;
+    }
+    await dashboard.storage.set(patch);
+    await syncResumeProfile({ ...saved, ...patch }, false);
+    document.querySelector('#dashboard-resume-status').textContent = `已应用“${patch.activeProfileLabel}”，岗位匹配分已更新。`;
+    document.querySelector('#dashboard-resume-apply').disabled = true;
+    resumeCandidate = null;
+  }
+
+  function installResumeUpload() {
+    const input = document.querySelector('#dashboard-resume-file');
+    const apply = document.querySelector('#dashboard-resume-apply');
+    if (!input || !apply) return;
+    input.addEventListener('change', event => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      resumeCandidate = null;
+      apply.disabled = true;
+      const status = document.querySelector('#dashboard-resume-status');
+      const preview = document.querySelector('#dashboard-resume-preview');
+      preview.hidden = true;
+      status.textContent = '正在本地读取并分类简历…';
+      readResumeText(file).then(text => {
+        if (!globalThis.ResumeParser?.parseResumeText) throw new Error('简历解析组件未加载。');
+        const parsed = ResumeParser.parseResumeText(text);
+        resumeCandidate = { ...parsed, fileName: file.name };
+        preview.textContent = resumeSummary(parsed);
+        preview.hidden = false;
+        apply.disabled = false;
+        status.textContent = '分类完成，请检查识别结果后应用。';
+      }).catch(error => { status.textContent = `解析失败：${error.message}`; }).finally(() => { input.value = ''; });
+    });
+    apply.addEventListener('click', () => applyDashboardResume().catch(error => dashboard.flash(`简历应用失败：${error.message}`, true)));
+  }
+
   installEvents();
+  installResumeUpload();
   load().catch(error => dashboard.flash(`读取岗位库失败：${error.message}`, true));
 
   if (globalThis.chrome?.storage?.onChanged?.addListener) {

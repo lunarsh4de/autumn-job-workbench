@@ -3,12 +3,12 @@ const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const { content, popup, source, until } = require('./helpers.cjs');
 
-test('manifest uses temporary active-tab access without persistent host permission', () => {
+test('manifest keeps job-page access temporary and limits cloud backup hosts to GitHub', () => {
   const manifest = JSON.parse(source('manifest.json'));
   assert.equal(manifest.version, '0.15.0');
   assert.equal(manifest.homepage_url, 'https://github.com/lunarsh4de');
   assert.deepEqual(manifest.permissions.sort(), ['activeTab', 'contextMenus', 'scripting', 'storage', 'unlimitedStorage'].sort());
-  assert.equal(manifest.host_permissions, undefined);
+  assert.deepEqual(manifest.host_permissions.sort(), ['https://api.github.com/*', 'https://github.com/*'].sort());
   assert.equal(manifest.content_scripts, undefined);
   assert.deepEqual(manifest.web_accessible_resources[0].matches, ['http://*/*', 'https://*/*']);
   assert.equal(manifest.commands['quick-fill'].suggested_key.default, 'Alt+Shift+F');
