@@ -43,6 +43,10 @@ class RefreshJobsTests(unittest.TestCase):
         self.assertEqual(job["province"], "浙江")
         self.assertEqual(job["city"], "杭州")
 
+    def test_region_parts_cover_expanded_mainland_cities(self):
+        self.assertEqual(refresh_jobs.region_parts({"location": "江苏-泰州-海陵区"}), ("江苏", "泰州"))
+        self.assertEqual(refresh_jobs.region_parts({"location": "新余-新余-渝水区"}), ("江西", "新余"))
+
     def test_greenhouse_keeps_mainland_china_and_excludes_hong_kong(self):
         payload = {"jobs": [
             {"title": "China Product Manager", "location": {"name": "Shanghai, China"}, "absolute_url": "https://example.com/cn", "content": "<p>Build&nbsp;products</p>"},

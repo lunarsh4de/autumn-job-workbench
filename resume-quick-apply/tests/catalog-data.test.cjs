@@ -45,6 +45,11 @@ test('catalog classifies imported roles and derives province-city fields', () =>
   assert.equal(C.formatRegion(job), '浙江 · 杭州');
 });
 
+test('catalog derives expanded mainland city mappings', () => {
+  assert.deepEqual(C.regionParts({ location: '江苏-泰州-海陵区' }), { province: '江苏', city: '泰州' });
+  assert.deepEqual(C.regionParts({ location: '新余-新余-渝水区' }), { province: '江西', city: '新余' });
+});
+
 test('catalog falls back to a bounded category for unknown new roles', () => {
   const job = C.item({ company: '示例', title: '校园招聘专员', location: '上海' });
   assert.equal(job.jobType, '职能管培');
