@@ -11,6 +11,7 @@
   };
   let resumeCandidate = null;
   let publicSyncing = false;
+  let importing = false;
 
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -188,6 +189,18 @@
   }
 
   async function importJobs() {
+    if (importing) return;
+    importing = true;
+    const submit = document.querySelector('#import-form button[type="submit"]');
+    const result = document.querySelector('#import-result');
+    if (submit) {
+      submit.disabled = true;
+      submit.setAttribute('aria-busy', 'true');
+    }
+    result.dataset.error = 'false';
+    result.textContent = '正在解析并合并岗位…';
+    result.hidden = false;
+    try {
     const file = document.querySelector('#catalog-file').files[0];
     const paste = document.querySelector('#catalog-paste').value.trim();
     const remote = document.querySelector('#catalog-url').value.trim();
@@ -213,11 +226,22 @@
     state.items = merged.items;
     state.visible = 200;
     render();
-    const result = document.querySelector('#import-result');
     result.textContent = `导入完成：新增 ${merged.added} 条，更新 ${merged.updated} 条，本地共 ${merged.items.length} 条。`;
     result.hidden = false;
     document.querySelector('#import-dialog').close();
     dashboard.flash(`岗位库已更新：新增 ${merged.added} 条。`);
+    } catch (error) {
+      result.dataset.error = 'true';
+      result.textContent = `导入失败：${error.message || '请检查数据格式后重试。'}`;
+      result.hidden = false;
+      throw error;
+    } finally {
+      importing = false;
+      if (submit) {
+        submit.disabled = false;
+        submit.setAttribute('aria-busy', 'false');
+      }
+    }
   }
 
   async function savePreferences() {
@@ -233,7 +257,9 @@
 
   function showImport() {
     const dialog = document.querySelector('#import-dialog');
-    document.querySelector('#import-result').hidden = true;
+    const result = document.querySelector('#import-result');
+    result.hidden = true;
+    result.dataset.error = 'false';
     dialog.showModal();
   }
 

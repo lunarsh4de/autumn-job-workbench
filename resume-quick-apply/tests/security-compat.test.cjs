@@ -144,6 +144,16 @@ test('dashboard exposes a disabled button affordance and keeps profile toasts ou
   assert.match(dashboard, /#view-profile:not\(\[hidden\]\)/);
 });
 
+test('catalog import exposes an in-dialog error state and prevents concurrent submissions', () => {
+  const catalog = source('catalog.js');
+  const css = source('dashboard.css');
+  assert.match(catalog, /let importing = false/);
+  assert.match(catalog, /if \(importing\) return/);
+  assert.match(catalog, /button\[type="submit"\]/);
+  assert.match(catalog, /导入失败：\$\{error\.message/);
+  assert.match(css, /\.import-result\[data-error="true"\]/);
+});
+
 test('resume parsers are self-hosted with licenses and no remote script tags', () => {
   const path = require('node:path');
   const root = path.join(__dirname, '..', 'vendor');

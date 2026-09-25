@@ -334,6 +334,7 @@ tbody tr:last-child td { border-bottom: 0; }
 .import-file strong { font-size: 12px; }
 .import-file small { margin-top: 2px; color: var(--muted); font-size: 10px; }
 .import-result { border-radius: 5px; padding: 8px 10px; background: #e7f4f1; color: #276c62; font-size: 11px; }
+.import-result[data-error="true"] { background: #f9eaea; color: var(--danger); }
 .import-result[hidden] { display: none; }
 .catalog-detail-content { width: min(660px, calc(100vw - 32px)); padding: 20px; }
 .catalog-detail-company { margin-top: 3px; color: var(--muted); font-size: 12px; }

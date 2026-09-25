@@ -162,6 +162,12 @@ try {
   if (!filterValue.companyInput || filterValue.hasAllCompanySelect || !filterValue.cityOptions.includes('上海') || filterValue.result !== '1 个岗位' || filterValue.searchResult !== '1 个岗位') {
     throw new Error(`Catalog filter smoke test failed: ${JSON.stringify(filterValue)}`);
   }
+  await client.send('Runtime.evaluate', {
+    expression: `(()=>{document.querySelector('#open-import').click();const input=document.querySelector('#catalog-paste');input.value='这不是有效岗位数据';document.querySelector('#import-form').requestSubmit();})()`
+  });
+  const importError = await waitForEvaluation(client, `(() => { const result=document.querySelector('#import-result'); const submit=document.querySelector('#import-form button[type="submit"]'); const dialog=document.querySelector('#import-dialog'); return result?.dataset.error === 'true' && /导入失败/.test(result.textContent) && dialog?.open && !submit?.disabled ? {message:result.textContent} : null; })()`);
+  if (!importError) throw new Error('Catalog import error-state smoke test failed.');
+  await client.send('Runtime.evaluate', { expression: `document.querySelector('#cancel-import').click()` });
   await client.send('Runtime.evaluate', { expression: `document.querySelector('#catalog-table [data-catalog-track]')?.click()` });
   const trackedMetadata = await waitForEvaluation(client, `(() => { const card=document.querySelector('#kanban .job-card'); return !document.querySelector('#view-board').hidden && card ? {text:card.textContent, companyType:card.textContent.includes('外企（中国大陆）'), jobType:card.textContent.includes('数据算法'), platform:card.textContent.includes('公开清单'), source:card.textContent.includes('岗位库')} : null; })()`);
   if (!trackedMetadata.companyType || !trackedMetadata.jobType || !trackedMetadata.platform || !trackedMetadata.source) throw new Error(`Catalog tracking metadata smoke test failed: ${JSON.stringify(trackedMetadata)}`);
