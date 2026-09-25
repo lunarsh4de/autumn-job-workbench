@@ -300,6 +300,7 @@ tbody tr:last-child td { border-bottom: 0; }
 .github-backup-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
 .github-backup-status { margin-top: 8px; color: var(--muted); font-size: 11px; }
 .github-backup-status[data-error="true"] { color: var(--danger); }
+.github-backup-status[data-local="true"] { color: #536b72; }
 .profile-layout { display: grid; grid-template-columns: minmax(300px, .9fr) minmax(350px, 1.1fr); gap: 12px; }
 .profile-identity { display: flex; align-items: center; gap: 12px; }
 .profile-avatar { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: #dcefea; color: var(--accent-dark); font-size: 18px; font-weight: 750; }

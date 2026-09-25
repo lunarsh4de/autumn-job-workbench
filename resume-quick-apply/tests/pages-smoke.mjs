@@ -74,7 +74,7 @@ try {
   const numericTotal = value => Number(String(value || '').replace(/,/g, ''));
   while (Date.now() < deadline) {
     const result = await client.send('Runtime.evaluate', {
-      expression: `({total:document.querySelector('#catalog-total')?.textContent,status:document.querySelector('#public-sync-status')?.textContent,rows:document.querySelectorAll('#catalog-table tr').length,error:document.querySelector('#toast')?.textContent})`,
+      expression: `({total:document.querySelector('#catalog-total')?.textContent,status:document.querySelector('#public-sync-status')?.textContent,rows:document.querySelectorAll('#catalog-table tr').length,error:document.querySelector('#toast')?.textContent,githubSignInDisabled:document.querySelector('#github-sign-in')?.disabled,githubStatus:document.querySelector('#github-backup-status')?.textContent})`,
       returnByValue: true
     });
     probe = result.result.value;
@@ -82,6 +82,7 @@ try {
     await wait(200);
   }
   if (!(numericTotal(probe?.total) > 3000) || probe?.rows < 2) throw new Error(`Pages auto sync failed: ${JSON.stringify(probe)}`);
+  if (probe.githubSignInDisabled !== true || !/网页版仅保存在本机/.test(probe.githubStatus || '')) throw new Error(`Pages backup boundary failed: ${JSON.stringify(probe)}`);
   console.log(JSON.stringify({ url: targetUrl, ...probe }, null, 2));
   await client.send('Browser.close');
 } finally {

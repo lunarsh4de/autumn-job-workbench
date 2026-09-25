@@ -15,6 +15,7 @@
   const signIn = document.querySelector('#github-sign-in');
   const save = document.querySelector('#github-save-backup');
   const signOut = document.querySelector('#github-sign-out');
+  const extensionAvailable = Boolean(globalThis.chrome?.runtime?.id);
   let token = '';
 
   function updateProfileUi(login = '') {
@@ -38,9 +39,10 @@
     }
   }
 
-  function setStatus(message, error = false) {
+  function setStatus(message, error = false, localOnly = false) {
     status.textContent = message;
     status.dataset.error = String(error);
+    status.dataset.local = String(localOnly);
   }
 
   async function github(path, options = {}) {
@@ -157,6 +159,10 @@
   signIn.addEventListener('click', () => connect());
   save.addEventListener('click', () => saveBackup());
   signOut.addEventListener('click', () => disconnect());
+  if (!extensionAvailable) {
+    signIn.disabled = true;
+    setStatus('网页版仅保存在本机；GitHub 私有备份请从投简历助手工作台打开。', false, true);
+  }
   storage.get(['githubGistToken', 'githubUserLogin', 'githubGistRefreshToken', 'githubGistExpiresAt']).then(async stored => {
     if (!stored.githubGistToken) return;
     token = stored.githubGistToken;
