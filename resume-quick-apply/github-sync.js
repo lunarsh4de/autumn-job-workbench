@@ -14,6 +14,7 @@
   const status = document.querySelector('#github-backup-status');
   const signIn = document.querySelector('#github-sign-in');
   const save = document.querySelector('#github-save-backup');
+  const restore = document.querySelector('#github-restore-backup');
   const signOut = document.querySelector('#github-sign-out');
   const extensionAvailable = Boolean(globalThis.chrome?.runtime?.id);
   let token = '';
@@ -43,6 +44,18 @@
     status.textContent = message;
     status.dataset.error = String(error);
     status.dataset.local = String(localOnly);
+  }
+
+  function setConnectedUi(login = '', gistId = '') {
+    const connected = Boolean(login && token);
+    signIn.hidden = connected;
+    save.disabled = !connected;
+    signOut.hidden = !connected;
+    if (restore) {
+      restore.hidden = !connected || !gistId;
+      restore.disabled = !connected || !gistId;
+    }
+    updateProfileUi(login);
   }
 
   async function github(path, options = {}) {
@@ -103,16 +116,13 @@
     signIn.disabled = true;
     try {
       if (!globalThis.chrome?.runtime?.id) throw new Error('GitHub 授权需要从已安装的投简历助手工作台打开。');
-      const stored = await storage.get(['githubGistToken']);
+      const stored = await storage.get(['githubGistToken', 'githubGistId']);
       const login = stored.githubGistToken ? { token: stored.githubGistToken, refreshToken: stored.githubGistRefreshToken || '', expiresAt: stored.githubGistExpiresAt || 0 } : await deviceLogin();
       token = login.token;
       const user = await github('/user');
       await storage.set({ githubGistToken: token, githubGistRefreshToken: login.refreshToken || null, githubGistExpiresAt: login.expiresAt || 0, githubUserLogin: user.login });
-      signIn.hidden = true;
-      save.disabled = false;
-      signOut.hidden = false;
-      updateProfileUi(user.login);
-      setStatus(`已连接 GitHub：${user.login}。个人备份仍需点击“保存到 GitHub”。`);
+      setConnectedUi(user.login, stored.githubGistId || '');
+      setStatus(stored.githubGistId ? `已连接 GitHub：${user.login}，已有私有备份可恢复。` : `已连接 GitHub：${user.login}。个人备份仍需点击“保存到 GitHub”。`);
     } catch (error) {
       token = '';
       setStatus(`GitHub 连接失败：${error.message}`, true);
@@ -134,13 +144,13 @@
         gist = await github('/gists', { method: 'POST', body: JSON.stringify({ description: GIST_DESCRIPTION, public: false, files: { [FILE_NAME]: { content } } }) });
       }
       await storage.set({ githubGistId: gist.id, githubBackupAt: Date.now() });
+      if (restore) { restore.hidden = false; restore.disabled = false; }
       setStatus(`已保存到 GitHub 私有 Gist：${new Date().toLocaleString('zh-CN')}`);
     } catch (error) {
       if (/401|Bad credentials|authentication/i.test(error.message)) {
         token = '';
         await storage.set({ githubGistToken: null, githubGistRefreshToken: null, githubGistExpiresAt: null, githubUserLogin: null });
-        signIn.hidden = false;
-        save.disabled = true;
+        setConnectedUi('');
       }
       setStatus(`GitHub 保存失败：${error.message}`, true);
     } finally { save.disabled = !token; }
@@ -148,32 +158,63 @@
 
   async function disconnect() {
     token = '';
-    await storage.set({ githubGistToken: null, githubGistRefreshToken: null, githubGistExpiresAt: null, githubUserLogin: null });
-    signIn.hidden = false;
-    signOut.hidden = true;
-    save.disabled = true;
-    updateProfileUi('');
+    await storage.set({ githubGistToken: null, githubGistRefreshToken: null, githubGistExpiresAt: null, githubUserLogin: null, githubGistId: null, githubBackupAt: null });
+    setConnectedUi('');
     setStatus('已退出 GitHub，本地数据未删除。');
+  }
+
+  async function readBackupFile() {
+    const stored = await storage.get(['githubGistId']);
+    if (!stored.githubGistId) throw new Error('尚未找到 GitHub 私有备份，请先保存一次。');
+    const gist = await github(`/gists/${encodeURIComponent(stored.githubGistId)}`);
+    const file = gist.files?.[FILE_NAME];
+    if (!file) throw new Error('私有 Gist 中没有找到工作台备份文件。');
+    let content = file.content || '';
+    if (file.truncated && file.raw_url) {
+      const response = await fetch(file.raw_url, { headers: { Accept: 'application/json', Authorization: `Bearer ${token}` } });
+      if (!response.ok) throw new Error(`读取备份文件失败（HTTP ${response.status}）。`);
+      content = await response.text();
+    }
+    if (!content) throw new Error('GitHub 返回的备份文件为空。');
+    return JSON.parse(content);
+  }
+
+  async function restoreBackup() {
+    if (!token) throw new Error('请先登录 GitHub。');
+    if (!globalThis.BackupSyncData?.prepare) throw new Error('恢复组件未加载，请刷新页面后重试。');
+    restore.disabled = true;
+    try {
+      const payload = await readBackupFile();
+      const patch = BackupSyncData.prepare(payload);
+      const count = Array.isArray(patch.jobTrackerItems) ? patch.jobTrackerItems.length : 0;
+      if (!confirm(`确认从 GitHub 恢复个人备份？这会覆盖当前浏览器中的简历、投递记录和${count}条看板记录。`)) return;
+      await storage.set(patch);
+      setStatus('恢复成功，页面即将刷新以载入完整资料。');
+      window.setTimeout(() => window.location.reload(), 250);
+    } catch (error) {
+      setStatus(`GitHub 恢复失败：${error.message}`, true);
+    } finally {
+      restore.disabled = false;
+    }
   }
 
   signIn.addEventListener('click', () => connect());
   save.addEventListener('click', () => saveBackup());
+  restore?.addEventListener('click', () => restoreBackup());
   signOut.addEventListener('click', () => disconnect());
   if (!extensionAvailable) {
     signIn.disabled = true;
+    if (restore) restore.disabled = true;
     setStatus('网页版仅保存在本机；GitHub 私有备份请从投简历助手工作台打开。', false, true);
   }
-  storage.get(['githubGistToken', 'githubUserLogin', 'githubGistRefreshToken', 'githubGistExpiresAt']).then(async stored => {
+  storage.get(['githubGistToken', 'githubUserLogin', 'githubGistRefreshToken', 'githubGistExpiresAt', 'githubGistId']).then(async stored => {
     if (!stored.githubGistToken) return;
     token = stored.githubGistToken;
     try {
       const user = await github('/user');
-      signIn.hidden = true;
-      save.disabled = false;
-      signOut.hidden = false;
-      updateProfileUi(user.login);
-      setStatus(`已连接 GitHub：${user.login}。`);
-    } catch { token = ''; await storage.set({ githubGistToken: null, githubGistRefreshToken: null, githubGistExpiresAt: null, githubUserLogin: null }); updateProfileUi(''); }
+      setConnectedUi(user.login, stored.githubGistId || '');
+      setStatus(stored.githubGistId ? `已连接 GitHub：${user.login}，已有私有备份可恢复。` : `已连接 GitHub：${user.login}。`);
+    } catch { token = ''; await storage.set({ githubGistToken: null, githubGistRefreshToken: null, githubGistExpiresAt: null, githubUserLogin: null }); setConnectedUi(''); }
   }).then(() => {
     if (!token) updateProfileUi('');
   }).catch(() => {});

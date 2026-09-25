@@ -74,7 +74,7 @@ try {
   const numericTotal = value => Number(String(value || '').replace(/,/g, ''));
   while (Date.now() < deadline) {
     const result = await client.send('Runtime.evaluate', {
-      expression: `({total:document.querySelector('#catalog-total')?.textContent,status:document.querySelector('#public-sync-status')?.textContent,statusTitle:document.querySelector('#public-sync-status')?.title,rows:document.querySelectorAll('#catalog-table tr').length,error:document.querySelector('#toast')?.textContent,githubSignInDisabled:document.querySelector('#github-sign-in')?.disabled,githubStatus:document.querySelector('#github-backup-status')?.textContent})`,
+      expression: `({total:document.querySelector('#catalog-total')?.textContent,status:document.querySelector('#public-sync-status')?.textContent,statusTitle:document.querySelector('#public-sync-status')?.title,rows:document.querySelectorAll('#catalog-table tr').length,error:document.querySelector('#toast')?.textContent,githubSignInDisabled:document.querySelector('#github-sign-in')?.disabled,githubRestoreHidden:document.querySelector('#github-restore-backup')?.hidden,githubStatus:document.querySelector('#github-backup-status')?.textContent})`,
       returnByValue: true
     });
     probe = result.result.value;
@@ -83,7 +83,7 @@ try {
   }
   if (!(numericTotal(probe?.total) > 3000) || probe?.rows < 2) throw new Error(`Pages auto sync failed: ${JSON.stringify(probe)}`);
   if (!/来源 \d+\/\d+ 正常/.test(probe.status || '')) throw new Error(`Pages source health status failed: ${JSON.stringify(probe)}`);
-  if (probe.githubSignInDisabled !== true || !/网页版仅保存在本机/.test(probe.githubStatus || '')) throw new Error(`Pages backup boundary failed: ${JSON.stringify(probe)}`);
+  if (probe.githubSignInDisabled !== true || probe.githubRestoreHidden !== true || !/网页版仅保存在本机/.test(probe.githubStatus || '')) throw new Error(`Pages backup boundary failed: ${JSON.stringify(probe)}`);
   console.log(JSON.stringify({ url: targetUrl, ...probe }, null, 2));
   await client.send('Browser.close');
 } finally {

@@ -10,7 +10,7 @@ $ErrorActionPreference = 'Stop'
 
 $sourceRoot = Split-Path -Parent $PSScriptRoot
 $manifestPath = Join-Path $sourceRoot 'manifest.json'
-$runtimeFiles = @('manifest.json', 'popup.html', 'popup.css', 'popup.js', 'dashboard.html', 'dashboard.css', 'dashboard.js', 'dashboard-data.js', 'catalog.js', 'catalog-data.js', 'catalog-db.js', 'content.js', 'data.js', 'resume-parser.js', 'service-worker.js', 'onboarding.html', 'README.md')
+$runtimeFiles = @('manifest.json', 'popup.html', 'popup.css', 'popup.js', 'dashboard.html', 'dashboard.css', 'dashboard.js', 'dashboard-data.js', 'catalog.js', 'catalog-data.js', 'catalog-db.js', 'content.js', 'data.js', 'backup-sync-data.js', 'resume-parser.js', 'service-worker.js', 'onboarding.html', 'README.md')
 $vendorFiles = @('pdf.min.mjs', 'pdf.worker.min.mjs', 'mammoth.browser.min.js', 'PDFJS-LICENSE', 'MAMMOTH-LICENSE')
 $edgeCandidates = @(
   "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",

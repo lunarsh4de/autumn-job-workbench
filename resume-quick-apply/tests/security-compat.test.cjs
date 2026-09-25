@@ -62,7 +62,7 @@ test('popup injects scripts on demand when an existing page has no listener', as
 });
 
 test('core extension runtime contains no remote network transports', () => {
-  const runtime = ['data.js', 'resume-parser.js', 'popup.js', 'dashboard-data.js', 'dashboard.js', 'catalog-data.js', 'catalog-db.js', 'content.js', 'service-worker.js'].map(source).join('\n');
+  const runtime = ['data.js', 'resume-parser.js', 'backup-sync-data.js', 'popup.js', 'dashboard-data.js', 'dashboard.js', 'catalog-data.js', 'catalog-db.js', 'content.js', 'service-worker.js'].map(source).join('\n');
   assert.doesNotMatch(runtime, /\bfetch\s*\(|XMLHttpRequest|WebSocket|sendBeacon/);
 });
 
@@ -71,6 +71,37 @@ test('catalog remote import is explicit, HTTPS-only and omits credentials', () =
   assert.match(catalog, /url\.protocol !== 'https:'/);
   assert.match(catalog, /credentials: 'omit'/);
   assert.doesNotMatch(catalog, /Authorization|Bearer|chrome\.identity/);
+});
+
+test('GitHub backup restore unwraps and validates local dashboard data', () => {
+  globalThis.ResumeData = require('../data.js');
+  globalThis.TrackerData = require('../dashboard-data.js');
+  const BackupSyncData = require('../backup-sync-data.js');
+  const patch = BackupSyncData.prepare({
+    schemaVersion: 1,
+    data: {
+      profile: { name: '恢复候选人' },
+      resumeProfiles: [{ id: 'product', label: '产品版', profile: { name: '恢复候选人' } }],
+      activeProfileId: 'product',
+      activeProfileLabel: '产品版',
+      applications: [{ url: 'https://jobs.example.test/1', title: '产品经理', createdAt: 1000 }],
+      jobTrackerItems: [{ id: 'tracked-1', company: '示例', title: '产品经理', stage: 'applied', source: 'catalog' }],
+      jobSearchPreferences: { roles: '产品经理', skills: 'SQL', cities: '上海' }
+    }
+  });
+  assert.equal(patch.profile.name, '恢复候选人');
+  assert.equal(patch.activeProfileId, 'product');
+  assert.equal(patch.activeProfileLabel, '产品版');
+  assert.equal(patch.applications.length, 1);
+  assert.equal(patch.jobTrackerItems[0].source, 'catalog');
+  assert.deepEqual(patch.jobSearchPreferences, { roles: '产品经理', skills: 'SQL', cities: '上海' });
+});
+
+test('GitHub backup restore rejects malformed wrapped payloads before writes', () => {
+  globalThis.ResumeData = require('../data.js');
+  globalThis.TrackerData = require('../dashboard-data.js');
+  const BackupSyncData = require('../backup-sync-data.js');
+  assert.throws(() => BackupSyncData.prepare({ data: { profile: { name: {} } } }), /字段|格式/);
 });
 
 test('resume parsers are self-hosted with licenses and no remote script tags', () => {
