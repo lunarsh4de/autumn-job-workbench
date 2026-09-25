@@ -372,6 +372,7 @@
     document.querySelector('#clear-catalog').addEventListener('click', async () => {
       if (!confirm('确认清空当前浏览器中的全部岗位库数据？申请看板不会被删除。')) return;
       await DB.clear();
+      await dashboard.storage.set({ publicCatalogSync: null });
       state.items = [];
       render();
       document.querySelector('#import-dialog').close();

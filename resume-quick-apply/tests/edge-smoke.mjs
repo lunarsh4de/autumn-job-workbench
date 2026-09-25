@@ -256,7 +256,20 @@ try {
       throw new Error(`Resume import did not persist structured experiences: ${JSON.stringify(resumeImport.applied)}`);
     }
   }
-  console.log(JSON.stringify({ edge, extension, popup: value, dashboard: dashboard.result.value, publicStatus, emptyResumeStatus, syncedResumeStatus, catalogFilters: filterValue, trackedMetadata, resetValue, mobile: mobile.result.value, screenshots: [desktopPath, mobilePath], resumeImport, profileRoot }, null, 2));
+  await client.send('Runtime.evaluate', {
+    expression: `chrome.storage.local.set({publicCatalogSync:{at:Date.now(),total:3298,sources:{enabled:3,ok:3,failed:[]}}})`,
+    awaitPromise: true
+  });
+  await client.send('Runtime.evaluate', { expression: `window.confirm=()=>true; document.querySelector('#open-import').click(); document.querySelector('#clear-catalog').click();` });
+  const clearCatalog = await waitForEvaluation(client, `document.querySelector('#catalog-total')?.textContent === '0' ? {total:document.querySelector('#catalog-total').textContent} : null`);
+  const clearStorage = await client.send('Runtime.evaluate', {
+    expression: `(async()=>{const s=await chrome.storage.local.get(['publicCatalogSync']);return {sync:s.publicCatalogSync ?? null,total:document.querySelector('#catalog-total')?.textContent};})()`,
+    awaitPromise: true,
+    returnByValue: true
+  });
+  const clearValue = clearStorage.result.value;
+  if (!clearCatalog || clearValue.total !== '0' || clearValue.sync !== null) throw new Error(`Catalog clear smoke test failed: ${JSON.stringify({ clearCatalog, clearValue })}`);
+  console.log(JSON.stringify({ edge, extension, popup: value, dashboard: dashboard.result.value, publicStatus, emptyResumeStatus, syncedResumeStatus, catalogFilters: filterValue, trackedMetadata, resetValue, mobile: mobile.result.value, screenshots: [desktopPath, mobilePath], resumeImport, clearCatalog: clearValue, profileRoot }, null, 2));
   await client.send('Browser.close');
 } finally {
   client?.close();
