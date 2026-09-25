@@ -177,6 +177,15 @@ test('recent dashboard jobs expose keyboard edit semantics', () => {
   assert.match(dashboard, /event\.key !== 'Enter' && event\.key !== ' '/);
 });
 
+test('kanban cards expose a touch and keyboard stage control', () => {
+  const dashboard = source('dashboard.js');
+  const css = source('dashboard.css');
+  assert.match(dashboard, /data-stage-for/);
+  assert.match(dashboard, /将 \$\{entry\.company\} \$\{entry\.title\} 移至阶段/);
+  assert.match(dashboard, /moveJob\(control\.dataset\.stageFor, control\.value\)/);
+  assert.match(css, /\.job-stage-control/);
+});
+
 test('catalog empty results offer a direct filter reset action', () => {
   const catalog = source('catalog.js');
   assert.match(catalog, /data-reset-catalog/);

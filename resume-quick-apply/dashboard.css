@@ -172,6 +172,8 @@ select { min-height: 36px; padding-right: 30px; }
 .job-meta { display: flex; flex-wrap: wrap; gap: 5px 9px; margin-top: 9px; color: var(--muted); font-size: 10px; }
 .job-meta span { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
 .job-meta img { width: 12px; height: 12px; opacity: .65; }
+.job-stage-control { width: 100%; min-height: 30px; margin-top: 9px; border-color: #dfe5e8; padding: 5px 8px; background: #f8fafb; color: #4f5d66; font-size: 10px; }
+.job-stage-control:focus { border-color: #5b9bd6; box-shadow: 0 0 0 2px #deedfa; }
 .job-next { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 9px; padding-top: 8px; border-top: 1px solid #edf0f2; color: var(--muted); font-size: 10px; }
 .job-next.overdue { color: var(--danger); font-weight: 650; }
 

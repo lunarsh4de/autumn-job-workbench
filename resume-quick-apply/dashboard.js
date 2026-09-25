@@ -327,6 +327,18 @@
     meta.append(element('span', '', entry.source === 'extension' ? '插件同步' : entry.source === 'catalog' ? '岗位库' : '手动添加'));
     if (entry.resumeProfileLabel) meta.append(element('span', '', `简历：${entry.resumeProfileLabel}`));
     card.append(meta);
+    const stageControl = document.createElement('select');
+    stageControl.className = 'job-stage-control';
+    stageControl.dataset.stageFor = entry.id;
+    stageControl.setAttribute('aria-label', `将 ${entry.company} ${entry.title} 移至阶段`);
+    for (const stage of TD.stages) {
+      const option = document.createElement('option');
+      option.value = stage.id;
+      option.textContent = `阶段：${stage.label}`;
+      option.selected = stage.id === entry.stage;
+      stageControl.append(option);
+    }
+    card.append(stageControl);
     const next = element('div', 'job-next');
     const nextValue = entry.interviewAt || entry.nextActionAt || entry.deadline;
     if (nextValue && new Date(nextValue).getTime() < Date.now()) next.classList.add('overdue');
@@ -640,6 +652,11 @@
       if (!card || !event.dataTransfer) return;
       event.dataTransfer.effectAllowed = 'move';
       event.dataTransfer.setData('text/plain', card.dataset.id);
+    });
+    document.querySelector('#kanban').addEventListener('change', event => {
+      const control = event.target.closest('[data-stage-for]');
+      if (!control) return;
+      moveJob(control.dataset.stageFor, control.value).catch(error => flash(error.message, true));
     });
     document.querySelector('#kanban').addEventListener('dragover', event => {
       const column = event.target.closest('.kanban-column');
