@@ -14,15 +14,18 @@
           <div><strong>秋招工作台</strong><span>2027 届</span></div>
         </div>
         <nav class="side-nav" aria-label="工作台导航">
-          <button class="nav-item active" type="button" data-view="overview"><img src="icons/layout-dashboard.svg" alt="" /><span>总览</span></button>
+          <button class="nav-item active" type="button" data-view="catalog"><img src="icons/database.svg" alt="" /><span>27届岗位库</span><b id="nav-catalog-count">0</b></button>
+          <button class="nav-item" type="button" data-view="overview"><img src="icons/layout-dashboard.svg" alt="" /><span>管理总览</span></button>
           <button class="nav-item" type="button" data-view="board"><img src="icons/kanban.svg" alt="" /><span>申请看板</span><b id="nav-active-count">0</b></button>
           <button class="nav-item" type="button" data-view="jobs"><img src="icons/list-filter.svg" alt="" /><span>全部岗位</span></button>
           <button class="nav-item" type="button" data-view="companies"><img src="icons/building-2.svg" alt="" /><span>公司</span></button>
           <button class="nav-item" type="button" data-view="calendar"><img src="icons/calendar.svg" alt="" /><span>日程</span></button>
         </nav>
         <div class="sidebar-footer">
+          <button class="nav-item" type="button" data-view="sources"><img src="icons/rss.svg" alt="" /><span>岗位来源</span></button>
           <button class="nav-item" id="open-popup" type="button"><img src="icons/settings.svg" alt="" /><span>投递资料</span></button>
           <div class="local-note"><span class="status-dot"></span><div><strong>仅保存在本机</strong><small>插件记录会自动同步</small></div></div>
+          <a class="author-credit" href="https://github.com/lunarsh4de" target="_blank" rel="noopener noreferrer">作者：Lunarsh4de · GitHub</a>
         </div>
       </aside>
 
@@ -30,18 +33,49 @@
         <header class="topbar">
           <div class="topbar-left">
             <button class="icon-button mobile-menu" id="mobile-menu" type="button" title="打开导航" aria-label="打开导航"><img src="icons/menu.svg" alt="" /></button>
-            <div><p class="eyebrow">PERSONAL JOB SEARCH OS</p><h1 id="view-title">秋招总览</h1></div>
+            <div><p class="eyebrow">PERSONAL JOB SEARCH OS</p><h1 id="view-title">27届秋招岗位</h1></div>
           </div>
           <div class="top-actions">
             <label class="global-search"><img src="icons/search.svg" alt="" /><input id="global-search" type="search" placeholder="搜索公司或岗位" autocomplete="off" /></label>
-            <button class="button secondary" id="export-jobs" type="button"><img src="icons/download.svg" alt="" /><span>导出</span></button>
+            <button class="button secondary" id="export-jobs" type="button" title="导出全部岗位" aria-label="导出全部岗位"><img src="icons/download.svg" alt="" /><span>导出</span></button>
             <button class="button primary" id="new-job" type="button"><img src="icons/plus.svg" alt="" /><span>新增岗位</span></button>
           </div>
         </header>
 
         <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-        <section class="view active" id="view-overview" data-title="秋招总览">
+        <section class="view active" id="view-catalog" data-title="27届秋招岗位">
+          <div class="catalog-heading">
+            <div><h2>本地岗位库</h2><p>批量导入公开岗位，在浏览器内筛选、匹配，再加入申请看板。</p></div>
+            <div class="catalog-actions"><button class="button secondary" type="button" id="rescore-catalog"><img src="icons/refresh-cw.svg" alt="" />重新评分</button><button class="button primary" type="button" id="open-import"><img src="icons/file-up.svg" alt="" />导入岗位</button></div>
+          </div>
+          <div class="source-banner"><img src="icons/database.svg" alt="" /><p><strong>数据来源</strong> <span id="public-sync-status">正在检查公共岗位源...</span>；岗位存入 IndexedDB，不会上传个人筛选和投递记录。</p><button class="text-link" id="sync-public-catalog" type="button">立即同步</button><button class="text-link" type="button" data-go-view="sources">查看来源</button></div>
+          <div class="metric-grid catalog-metrics" aria-label="岗位库数据">
+            <article class="metric-card"><div class="metric-label"><span>岗位总数</span><span class="metric-icon blue"><img src="icons/briefcase-business.svg" alt="" /></span></div><strong id="catalog-total">0</strong><small>当前浏览器本地岗位</small></article>
+            <article class="metric-card"><div class="metric-label"><span>覆盖公司</span><span class="metric-icon violet"><img src="icons/building-2.svg" alt="" /></span></div><strong id="catalog-companies">0</strong><small>按标准化公司名统计</small></article>
+            <article class="metric-card"><div class="metric-label"><span>高匹配</span><span class="metric-icon green"><img src="icons/star.svg" alt="" /></span></div><strong id="catalog-high-match">0</strong><small>本地评分 70 分及以上</small></article>
+            <article class="metric-card"><div class="metric-label"><span>岗位类型</span><span class="metric-icon orange"><img src="icons/list-filter.svg" alt="" /></span></div><strong id="catalog-types">0</strong><small>已自动归类</small></article>
+          </div>
+          <section class="match-strip" id="match-strip" hidden><div><span>高匹配岗位</span><strong id="match-strip-count">0 个岗位</strong></div><div id="match-strip-items"></div></section>
+          <section class="catalog-browser">
+            <div class="catalog-filter-head"><div><p class="eyebrow">SEARCH & FILTER</p><h3>全部岗位</h3></div><span id="catalog-result-count">0 个岗位</span></div>
+            <div class="catalog-filters">
+              <label class="catalog-search"><img src="icons/search.svg" alt="" /><input id="catalog-search" type="search" placeholder="搜索公司、岗位、地点或标签" /></label>
+              <label class="catalog-filter-input"><img src="icons/building-2.svg" alt="" /><input id="catalog-company" type="search" placeholder="筛选公司（输入关键字）" aria-label="筛选公司" /></label>
+              <select id="catalog-province" aria-label="按省份筛选"><option value="all">全部省份</option></select>
+              <select id="catalog-city" aria-label="按城市筛选"><option value="all">全部城市</option></select>
+              <select id="catalog-type" aria-label="筛选岗位类型"><option value="all">全部岗位类型</option></select>
+              <select id="catalog-platform" aria-label="筛选平台"><option value="all">全部平台</option></select>
+              <select id="catalog-score" aria-label="筛选匹配分"><option value="all">不限分数</option><option value="high">70 分以上</option><option value="medium">40–69 分</option><option value="low">低于 40 分</option></select>
+              <select id="catalog-sort" aria-label="岗位排序"><option value="match">匹配度优先</option><option value="latest">最近导入</option><option value="company">公司名称</option></select>
+              <button class="button ghost" id="reset-catalog-filters" type="button">重置</button>
+            </div>
+            <div class="table-wrap catalog-table"><table><thead><tr><th>公司</th><th>岗位</th><th>匹配度</th><th>工作地点</th><th>来源</th><th>操作</th></tr></thead><tbody id="catalog-table"></tbody></table></div>
+            <button class="button secondary load-more" id="catalog-more" type="button" hidden>再显示 200 条</button>
+          </section>
+        </section>
+
+        <section class="view" id="view-overview" data-title="管理总览" hidden>
           <div class="welcome-row">
             <div><h2>把每一次投递变成可推进的下一步</h2><p id="overview-caption">正在读取你的投递记录...</p></div>
             <button class="text-link" type="button" data-go-view="board">打开申请看板 <img src="icons/arrow-up-right.svg" alt="" /></button>
@@ -102,6 +136,23 @@
           <div class="view-toolbar"><div><h2>日程与跟进</h2><p>按时间管理面试、笔试和主动跟进</p></div></div>
           <div class="calendar-layout"><aside class="date-card"><span id="today-month"></span><strong id="today-day"></strong><small id="today-weekday"></small></aside><div class="timeline" id="timeline"></div></div>
         </section>
+
+        <section class="view" id="view-sources" data-title="岗位来源与导入" hidden>
+          <div class="view-toolbar"><div><h2>岗位来源与导入</h2><p>优先使用公开页面、官方导出和授权数据，不绕过登录、验证码或访问限制。</p></div><button class="button primary" type="button" data-open-import><img src="icons/file-up.svg" alt="" />导入岗位</button></div>
+          <div class="source-layout">
+            <section class="panel preference-panel"><div class="panel-head"><div><p class="eyebrow">LOCAL MATCHING</p><h3>本地匹配偏好</h3></div><span class="panel-meta">仅保存在本机</span></div><form id="preference-form" class="preference-form"><label>目标岗位<input name="roles" placeholder="产品经理，用户研究，数据分析" /></label><label>技能关键词<textarea name="skills" rows="3" placeholder="SQL，Python，Figma，用户访谈"></textarea></label><label>意向城市<input name="cities" placeholder="北京，上海，深圳" /></label><button class="button primary" type="submit"><img src="icons/save.svg" alt="" />保存并重新评分</button></form></section>
+            <section class="panel acquisition-panel"><div class="panel-head"><div><p class="eyebrow">ACQUISITION</p><h3>大量岗位怎么获取</h3></div></div><div class="acquisition-steps"><article><b>01</b><div><strong>官方校招站与就业平台</strong><p>可信度最高，适合浏览或导出；插件可在浏览岗位时收藏。</p></div></article><article><b>02</b><div><strong>公众号、飞书与社区清单</strong><p>将公开表格导出为 CSV，再导入工作台统一去重。</p></div></article><article><b>03</b><div><strong>GitHub Actions 定时整理</strong><p>只处理允许公开转载的数据，生成公共 JSON；个人状态仍留在浏览器。</p></div></article></div></section>
+          </div>
+          <div class="source-directory" id="source-directory">
+            <article class="source-card"><span class="source-kind">自动同步</span><h3>秋招情报站公开岗位</h3><p>当前默认 feed，聚合牛客和国聘；Action 每天两次读取并标准化。</p><a class="button secondary" href="https://github.com/SharkT2th/Jobhunter1" target="_blank" rel="noopener noreferrer">查看归属 <img src="icons/external-link.svg" alt="" /></a></article>
+            <article class="source-card"><span class="source-kind">国家平台</span><h3>国家大学生就业服务平台</h3><p>高校毕业生招聘、专场双选会和就业服务。</p><a class="button secondary" href="https://www.ncss.cn/" target="_blank" rel="noopener noreferrer">打开来源 <img src="icons/external-link.svg" alt="" /></a></article>
+            <article class="source-card"><span class="source-kind">国企央企</span><h3>国聘</h3><p>国企、央企及公共就业招聘信息。</p><a class="button secondary" href="https://www.iguopin.com/" target="_blank" rel="noopener noreferrer">打开来源 <img src="icons/external-link.svg" alt="" /></a></article>
+            <article class="source-card"><span class="source-kind">校招社区</span><h3>牛客校招</h3><p>校招岗位、公司日程、笔面试经验与讨论。</p><a class="button secondary" href="https://www.nowcoder.com/jobs/school" target="_blank" rel="noopener noreferrer">打开来源 <img src="icons/external-link.svg" alt="" /></a></article>
+            <article class="source-card"><span class="source-kind">综合校招</span><h3>应届生求职网</h3><p>按城市、行业和公司聚合校园招聘信息。</p><a class="button secondary" href="https://www.yingjiesheng.com/" target="_blank" rel="noopener noreferrer">打开来源 <img src="icons/external-link.svg" alt="" /></a></article>
+            <article class="source-card"><span class="source-kind">实习转正</span><h3>实习僧</h3><p>日常实习、暑期实习和可转正岗位。</p><a class="button secondary" href="https://www.shixiseng.com/" target="_blank" rel="noopener noreferrer">打开来源 <img src="icons/external-link.svg" alt="" /></a></article>
+            <article class="source-card"><span class="source-kind">开源清单</span><h3>GitHub 校招项目</h3><p>适合导入结构化公开清单；使用前检查更新时间和许可证。</p><a class="button secondary" href="https://github.com/search?q=%E6%A0%A1%E6%8B%9B+jobs&type=repositories" target="_blank" rel="noopener noreferrer">搜索项目 <img src="icons/external-link.svg" alt="" /></a></article>
+          </div>
+        </section>
       </main>
     </div>
 
@@ -126,7 +177,34 @@
       </form>
     </dialog>
 
+    <dialog id="import-dialog">
+      <form id="import-form" method="dialog">
+        <div class="dialog-head"><div><p class="eyebrow">LOCAL IMPORT</p><h2>批量导入岗位</h2></div><button class="icon-button" id="close-import" type="button" title="关闭" aria-label="关闭"><img src="icons/x.svg" alt="" /></button></div>
+        <div class="import-notice"><img src="icons/shield-check.svg" alt="" /><span>文件在当前浏览器解析并写入 IndexedDB，不会上传到服务器。</span></div>
+        <div class="import-methods">
+          <label class="import-file"><input id="catalog-file" type="file" accept=".csv,.json,text/csv,application/json" /><img src="icons/file-up.svg" alt="" /><span><strong>选择 CSV / JSON</strong><small>推荐用于上千条岗位</small></span></label>
+          <label>或粘贴公开数据<textarea id="catalog-paste" rows="8" placeholder="CSV 表头示例：公司,岗位,地点,链接,平台,岗位类型,标签,岗位描述"></textarea></label>
+          <label>或从公开 URL 获取<input id="catalog-url" type="url" placeholder="https://example.com/jobs.json" /><small>目标地址必须允许浏览器跨域访问；不要填需要登录或含私人令牌的链接。</small></label>
+        </div>
+        <div class="import-result" id="import-result" hidden></div>
+        <div class="dialog-actions import-dialog-actions"><button class="button danger ghost" id="clear-catalog" type="button"><img src="icons/trash-2.svg" alt="" />清空岗位库</button><button class="button secondary" id="download-template" type="button"><img src="icons/download.svg" alt="" />下载模板</button><span></span><button class="button secondary" id="cancel-import" type="button">取消</button><button class="button primary" type="submit"><img src="icons/database.svg" alt="" />开始导入</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="catalog-detail-dialog">
+      <div class="catalog-detail-content">
+        <div class="dialog-head"><div><p class="eyebrow">JOB DETAIL</p><h2 id="catalog-detail-title">岗位详情</h2><p id="catalog-detail-company"></p></div><button class="icon-button" id="catalog-detail-close" type="button" title="关闭" aria-label="关闭"><img src="icons/x.svg" alt="" /></button></div>
+        <div class="catalog-detail-summary"><span class="match-score" id="catalog-detail-score">未设置偏好</span><span id="catalog-detail-meta"></span></div>
+        <p class="catalog-detail-tags" id="catalog-detail-tags"></p>
+        <div class="catalog-detail-description" id="catalog-detail-description"></div>
+        <div class="dialog-actions"><span></span><a class="button secondary" id="catalog-detail-link" href="#" target="_blank" rel="noopener noreferrer">打开原始岗位 <img src="icons/external-link.svg" alt="" /></a><button class="button primary" id="catalog-detail-track" type="button"><img src="icons/kanban.svg" alt="" />加入申请看板</button></div>
+      </div>
+    </dialog>
+
+    <script src="catalog-data.js"></script>
+    <script src="catalog-db.js"></script>
     <script src="dashboard-data.js"></script>
     <script src="dashboard.js"></script>
+    <script src="catalog.js"></script>
   </body>
 </html>

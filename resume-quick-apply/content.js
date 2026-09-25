@@ -3,6 +3,7 @@
   globalThis.__resumeQuickApplyLoaded = true;
   const ROOT_ID = 'resume-quick-apply-root';
   let uiRoot = null;
+  let lastResumeProfile = null;
   const fieldPatterns = {
     name: /姓名|名字|full.?name|candidate.?name|real.?name|legal.?name|(^|\s)name(\s|$)/i,
     phone: /手机|电话|联系方式|mobile|phone|telephone|(^|\s)tel(\s|$)/i,
@@ -362,6 +363,9 @@
   }
 
   async function fill(state) {
+    if (state?.resumeProfileId || state?.resumeProfileLabel) {
+      lastResumeProfile = { id: state.resumeProfileId || '', label: state.resumeProfileLabel || '默认简历' };
+    }
     const profile = ResumeData.profile(state?.profile || {});
     const resume = ResumeData.resume(state?.resume);
     const experiences = ResumeData.experiences(state?.experiences);
@@ -482,7 +486,7 @@
   }
 
   async function markApplied(source = 'manual') {
-    const data = await chrome.storage.local.get(['applications']);
+    const data = await chrome.storage.local.get(['applications', 'activeProfileId', 'activeProfileLabel', 'resumeProfiles']);
     const applications = Array.isArray(data.applications) ? data.applications.filter(item => item && typeof item.url === 'string' && Number.isFinite(item.createdAt)) : [];
     const alreadyRecorded = applications.some((item) => item.url === location.href && Date.now() - item.createdAt < 24 * 60 * 60 * 1000);
     if (alreadyRecorded) {
@@ -490,7 +494,12 @@
       return false;
     }
     const identity = pageIdentity();
-    applications.unshift({ ...identity, url: location.href, createdAt: Date.now(), status: source === 'auto' ? 'submitted' : 'recorded', source });
+    const activeProfile = Array.isArray(data.resumeProfiles)
+      ? data.resumeProfiles.find(item => item && item.id === data.activeProfileId)
+      : null;
+    const resumeProfileId = lastResumeProfile?.id || activeProfile?.id || (typeof data.activeProfileId === 'string' ? data.activeProfileId : '');
+    const resumeProfileLabel = lastResumeProfile?.label || activeProfile?.label || (typeof data.activeProfileLabel === 'string' ? data.activeProfileLabel : '') || '默认简历';
+    applications.unshift({ ...identity, url: location.href, createdAt: Date.now(), status: source === 'auto' ? 'submitted' : 'recorded', source, resumeProfileId, resumeProfileLabel });
     await chrome.storage.local.set({ applications: applications.slice(0, 500) });
     showStatus(source === 'auto' ? '检测到投递成功，已自动记录。' : '已记录本次投递。', 'success');
     return true;
@@ -614,7 +623,9 @@
     root.querySelector('.rqa-fill').addEventListener('click', async event => {
       if (!event.isTrusted) return;
       try {
-        const state = await chrome.storage.local.get(['profile', 'resume', 'experiences']);
+        const state = await chrome.storage.local.get(['profile', 'resume', 'experiences', 'activeProfileId', 'activeProfileLabel']);
+        state.resumeProfileId = state.activeProfileId || '';
+        state.resumeProfileLabel = state.activeProfileLabel || '默认简历';
         await runFill(state);
       } catch (error) { showStatus(error.message); }
     });

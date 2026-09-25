@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
   [switch]$ValidateOnly,
   [string]$Destination,
@@ -10,7 +10,7 @@ $ErrorActionPreference = 'Stop'
 
 $sourceRoot = Split-Path -Parent $PSScriptRoot
 $manifestPath = Join-Path $sourceRoot 'manifest.json'
-$runtimeFiles = @('manifest.json', 'popup.html', 'popup.css', 'popup.js', 'content.js', 'data.js', 'resume-parser.js', 'service-worker.js', 'onboarding.html', 'README.md')
+$runtimeFiles = @('manifest.json', 'popup.html', 'popup.css', 'popup.js', 'dashboard.html', 'dashboard.css', 'dashboard.js', 'dashboard-data.js', 'catalog.js', 'catalog-data.js', 'catalog-db.js', 'content.js', 'data.js', 'resume-parser.js', 'service-worker.js', 'onboarding.html', 'README.md')
 $vendorFiles = @('pdf.min.mjs', 'pdf.worker.min.mjs', 'mammoth.browser.min.js', 'PDFJS-LICENSE', 'MAMMOTH-LICENSE')
 $edgeCandidates = @(
   "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
@@ -41,12 +41,8 @@ if ($ValidateOnly) {
 
 if (-not $NoLaunch) {
   Add-Type -AssemblyName PresentationFramework
-  [System.Windows.MessageBox]::Show(
-    "Edge requires Developer mode before a local extension can be loaded.`n`nThe helper will copy all files and open edge://extensions. Turn on Developer mode, click Load unpacked, then choose the opened Extension folder.`n`nFor a true one-click install, the extension must be published in Microsoft Edge Add-ons.",
-    'Resume Quick Apply - Installation Notice',
-    [System.Windows.MessageBoxButton]::OK,
-    [System.Windows.MessageBoxImage]::Information
-  ) | Out-Null
+  $installMessage = 'Edge 本地扩展需要先打开开发人员模式。安装助手会复制扩展文件，并打开 Edge 扩展管理页、中文安装教程和 ResumeQuickApply 文件夹。请按教程操作：点击右上角拼图图标→管理扩展→打开左侧开发人员模式→加载解压缩的扩展。文件夹窗口停留在 ResumeQuickApply 这一层，直接选中 Extension 文件夹，不要进入 Extension。真正的一键安装需要发布到 Microsoft Edge 扩展商店；本地安装不会修改系统策略，也不需要管理员权限。'
+  [System.Windows.MessageBox]::Show($installMessage, '投简历助手 - 安装提示', [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
 }
 
 $targetRoot = if ($Destination) { [System.IO.Path]::GetFullPath($Destination) } else { Join-Path $env:LOCALAPPDATA 'ResumeQuickApply\Extension' }
@@ -73,11 +69,11 @@ if ($NoLaunch) {
 
 $guidePath = Join-Path $PSScriptRoot 'install-guide.html'
 $guideUri = [System.Uri]::new($guidePath).AbsoluteUri
-Start-Process -FilePath 'explorer.exe' -ArgumentList "/select,`"$(Join-Path $targetRoot 'manifest.json')`""
+Start-Process -FilePath 'explorer.exe' -ArgumentList "/select,`"$targetRoot`""
 Start-Process -FilePath $edgePath -ArgumentList @('edge://extensions/', $guideUri)
 
 Write-Output ''
-Write-Output "Extension files copied to: $targetRoot"
-Write-Output 'Edge and the visual install guide are now open.'
-Write-Output 'Complete the final browser confirmation shown in the guide.'
-Read-Host 'Press Enter to close this window'
+Write-Output "扩展文件已复制到：$targetRoot"
+Write-Output 'Edge、中文安装教程和 ResumeQuickApply 文件夹已打开。'
+Write-Output '请按教程完成浏览器中的最后确认。'
+Read-Host '按回车键关闭此窗口'

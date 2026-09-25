@@ -2,8 +2,9 @@
 (() => {
   const fields = ['name', 'phone', 'email', 'city', 'education', 'school', 'skills', 'website', 'summary'];
   const maxResumeBytes = 3 * 1024 * 1024;
-  const maxImportBytes = 5 * 1024 * 1024;
+  const maxImportBytes = 64 * 1024 * 1024;
   const maxResumeImportBytes = 10 * 1024 * 1024;
+  const maxResumeProfiles = 12;
   const experienceSchemas = {
     work: ['company', 'role', 'location', 'startDate', 'endDate', 'description'],
     education: ['school', 'degree', 'major', 'startDate', 'endDate', 'description'],
@@ -64,10 +65,67 @@
       })];
     }));
   }
+  function resumeProfile(value) {
+    if (!record(value)) throw new Error('简历档案必须是 JSON 对象。');
+    if (typeof value.id !== 'string' || !/^[a-zA-Z0-9_-]{1,80}$/.test(value.id)) throw new Error('简历档案 ID 不正确。');
+    if (typeof value.label !== 'string' || !value.label.trim() || value.label.length > 80) throw new Error('简历档案名称不正确或过长。');
+    const createdAt = value.createdAt == null ? Date.now() : Number(value.createdAt);
+    const updatedAt = value.updatedAt == null ? createdAt : Number(value.updatedAt);
+    if (!Number.isFinite(createdAt) || !Number.isFinite(updatedAt)) throw new Error('简历档案时间格式不正确。');
+    return {
+      id: value.id,
+      label: value.label.trim(),
+      profile: profile(value.profile),
+      resume: resume(value.resume),
+      settings: settings(value.settings),
+      experiences: experiences(value.experiences),
+      createdAt,
+      updatedAt
+    };
+  }
+  function resumeProfiles(value) {
+    if (value == null) return [];
+    if (!Array.isArray(value) || value.length > maxResumeProfiles) throw new Error(`简历档案最多保存 ${maxResumeProfiles} 份。`);
+    const seen = new Set();
+    return value.map(item => {
+      const normalized = resumeProfile(item);
+      if (seen.has(normalized.id)) throw new Error('简历档案 ID 重复。');
+      seen.add(normalized.id);
+      return normalized;
+    });
+  }
+  function applications(value) {
+    if (value == null) return [];
+    if (!Array.isArray(value)) throw new Error('投递记录必须是数组。');
+    return value.slice(0, 500).map(item => {
+      if (!record(item) || typeof item.url !== 'string' || !Number.isFinite(item.createdAt)) return null;
+      try {
+        const url = new URL(item.url);
+        if (!['http:', 'https:'].includes(url.protocol)) return null;
+      } catch { return null; }
+      const text = (input, max) => typeof input === 'string' ? input.trim().slice(0, max) : '';
+      return {
+        url: item.url,
+        title: text(item.title, 240),
+        company: text(item.company, 160),
+        status: item.status === 'submitted' ? 'submitted' : 'recorded',
+        source: item.source === 'auto' ? 'auto' : 'manual',
+        resumeProfileId: text(item.resumeProfileId, 80),
+        resumeProfileLabel: text(item.resumeProfileLabel, 80),
+        createdAt: item.createdAt
+      };
+    }).filter(Boolean);
+  }
   function backup(value) {
     if (!record(value) || !Object.hasOwn(value, 'profile')) throw new Error('不是有效的资料备份，缺少 profile 字段。');
-    if (value.schemaVersion != null && ![1, 2, 3].includes(value.schemaVersion)) throw new Error('不支持此备份版本。');
-    return { profile: profile(value.profile), resume: resume(value.resume), settings: settings(value.settings), experiences: experiences(value.experiences) };
+    if (value.schemaVersion != null && ![1, 2, 3, 4].includes(value.schemaVersion)) throw new Error('不支持此备份版本。');
+    const normalized = { profile: profile(value.profile), resume: resume(value.resume), settings: settings(value.settings), experiences: experiences(value.experiences), applications: applications(value.applications) };
+    const profiles = resumeProfiles(value.resumeProfiles);
+    if (!profiles.length) return normalized;
+    const activeProfileId = typeof value.activeProfileId === 'string' && profiles.some(item => item.id === value.activeProfileId)
+      ? value.activeProfileId : profiles[0].id;
+    const active = profiles.find(item => item.id === activeProfileId);
+    return { ...normalized, resumeProfiles: profiles, activeProfileId, profile: active.profile, resume: active.resume, settings: active.settings, experiences: active.experiences };
   }
   function createQueue() {
     let tail = Promise.resolve();
@@ -77,7 +135,7 @@
       return result;
     };
   }
-  const api = { fields, experienceSchemas, maxResumeBytes, maxImportBytes, maxResumeImportBytes, profile, resume, settings, experiences, backup, createQueue };
+  const api = { fields, experienceSchemas, maxResumeBytes, maxImportBytes, maxResumeImportBytes, maxResumeProfiles, profile, resume, settings, experiences, resumeProfile, resumeProfiles, applications, backup, createQueue };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else globalThis.ResumeData = api;
 })();

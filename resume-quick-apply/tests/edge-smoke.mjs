@@ -1,11 +1,12 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const extensionRoot = resolve(process.env.RQA_EXTENSION_ROOT || resolve(here, '..'));
-const profileRoot = process.env.RQA_EDGE_PROFILE ? resolve(process.env.RQA_EDGE_PROFILE) : resolve(here, '..', '..', 'output', 'edge-smoke-0.12.2');
+const profileRoot = process.env.RQA_EDGE_PROFILE ? resolve(process.env.RQA_EDGE_PROFILE) : resolve(here, '..', '..', 'output', 'edge-smoke-0.15.0');
+const screenshotRoot = resolve(here, '..', '..', 'output');
 const resumeFixture = process.env.RQA_RESUME_FIXTURE ? resolve(process.env.RQA_RESUME_FIXTURE) : null;
 const edgeCandidates = [
   'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
@@ -106,14 +107,70 @@ try {
   });
   const extension = probe.result.value;
   if (!extension || extension.name !== '投简历助手') throw new Error(`Edge extension target did not expose the expected manifest. Target: ${extensionTarget.url} Probe: ${JSON.stringify(extension)} Log: ${edgeLog.slice(-4000)}`);
-  if (extension.version !== '0.12.2') throw new Error(`Unexpected Edge extension version: ${extension.version}`);
+  if (extension.version !== '0.15.0') throw new Error(`Unexpected Edge extension version: ${extension.version}`);
   if (extension.shortcut !== 'Alt+Shift+F') throw new Error(`Unexpected quick-fill shortcut: ${extension.shortcut}`);
   const popup = await client.send('Runtime.evaluate', {
-    expression: `({ title: document.title, fill: !!document.querySelector('#fill-button'), profile: !!document.querySelector('#profile-form'), quickAttachment: !!document.querySelector('#quick-attachment'), tabs: document.querySelectorAll('[role="tab"]').length })`,
+    expression: `({ title: document.title, fill: !!document.querySelector('#fill-button'), profile: !!document.querySelector('#profile-form'), quickAttachment: !!document.querySelector('#quick-attachment'), profileSelect: !!document.querySelector('#resume-profile-select'), tabs: document.querySelectorAll('[role="tab"]').length })`,
     returnByValue: true
   });
   const value = popup.result.value;
-  if (value.title !== '投简历助手' || !value.fill || !value.profile || !value.quickAttachment || value.tabs !== 4) throw new Error(`Popup smoke test failed: ${JSON.stringify(value)}`);
+  if (value.title !== '投简历助手' || !value.fill || !value.profile || !value.quickAttachment || !value.profileSelect || value.tabs !== 4) throw new Error(`Popup smoke test failed: ${JSON.stringify(value)}`);
+  await client.send('Runtime.evaluate', {
+    expression: `(async()=>chrome.storage.local.set({jobTrackerItems:[
+      {id:'demo-1',company:'字节跳动',title:'产品经理',stage:'interview',priority:'high',location:'北京',salary:'25-40K',url:'https://jobs.example.test/1',nextActionAt:'2026-09-24T14:00',interviewAt:'2026-09-24T14:00',notes:'准备产品案例',source:'manual',createdAt:Date.now()-86400000,updatedAt:Date.now()},
+      {id:'demo-2',company:'腾讯',title:'用户研究员',stage:'assessment',priority:'medium',location:'深圳',url:'https://jobs.example.test/2',nextActionAt:'2026-09-23T20:00',notes:'完成测评',source:'extension',createdAt:Date.now()-172800000,updatedAt:Date.now()-3600000},
+      {id:'demo-3',company:'小米',title:'产品运营',stage:'applied',priority:'normal',location:'上海',url:'https://jobs.example.test/3',deadline:'2026-10-10',notes:'',source:'extension',createdAt:Date.now()-259200000,updatedAt:Date.now()-7200000},
+      {id:'demo-4',company:'美团',title:'商业分析师',stage:'offer',priority:'high',location:'北京',salary:'24-38K',url:'https://jobs.example.test/4',notes:'比较薪酬方案',source:'manual',createdAt:Date.now()-345600000,updatedAt:Date.now()-10800000}
+    ]}))()`,
+    awaitPromise: true
+  });
+  await client.send('Page.navigate', { url: `chrome-extension://${extensionId}/dashboard.html` });
+  await waitForEvaluation(client, `document.querySelectorAll('#view-catalog .metric-card').length===4 && document.querySelector('#catalog-total').textContent!=='0'`);
+  await client.send('Runtime.evaluate', {
+    expression: `(()=>{document.querySelector('#open-import').click();const input=document.querySelector('#catalog-paste');input.value='公司,岗位,地点,链接,平台,标签\\n示例科技,数据分析师,上海,https://jobs.example.test/imported,公开清单,"SQL,Python"';input.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#import-form').requestSubmit();})()`
+  });
+  await waitForEvaluation(client, `document.querySelector('#catalog-total').textContent==='5' && /导入完成/.test(document.querySelector('#import-result').textContent)`);
+  const catalogFilters = await client.send('Runtime.evaluate', {
+    expression: `(()=>{
+      const province=document.querySelector('#catalog-province');
+      const city=document.querySelector('#catalog-city');
+      const company=document.querySelector('#catalog-company');
+      const hasAllCompanySelect=!!document.querySelector('#catalog-company option');
+      province.value='上海';
+      province.dispatchEvent(new Event('change',{bubbles:true}));
+      const cityOptions=[...city.options].map(option=>option.textContent);
+      company.value='示例';
+      company.dispatchEvent(new Event('input',{bubbles:true}));
+      return {companyInput:company.type==='search',hasAllCompanySelect,cityOptions,result:document.querySelector('#catalog-result-count').textContent};
+    })()`,
+    returnByValue: true
+  });
+  const filterValue = catalogFilters.result.value;
+  if (!filterValue.companyInput || filterValue.hasAllCompanySelect || !filterValue.cityOptions.includes('上海') || filterValue.result !== '1 个岗位') {
+    throw new Error(`Catalog filter smoke test failed: ${JSON.stringify(filterValue)}`);
+  }
+  await client.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  await wait(250);
+  const dashboard = await client.send('Runtime.evaluate', {
+    expression: `({title:document.title,metrics:document.querySelectorAll('#view-catalog .metric-card').length,catalog:document.querySelector('#catalog-total').textContent,recent:document.querySelectorAll('.recent-item').length,nav:document.querySelectorAll('.nav-item').length,overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth})`,
+    returnByValue: true
+  });
+  if (dashboard.result.value.title !== '秋招工作台' || dashboard.result.value.metrics !== 4 || dashboard.result.value.recent < 1 || dashboard.result.value.overflow) {
+    throw new Error(`Dashboard desktop smoke test failed: ${JSON.stringify(dashboard.result.value)}`);
+  }
+  const desktopShot = await client.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+  const desktopPath = join(screenshotRoot, 'dashboard-desktop.png');
+  writeFileSync(desktopPath, Buffer.from(desktopShot.data, 'base64'));
+  await client.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await wait(250);
+  const mobile = await client.send('Runtime.evaluate', {
+    expression: `({overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,menu:getComputedStyle(document.querySelector('#mobile-menu')).display,sidebar:getComputedStyle(document.querySelector('#sidebar')).transform})`,
+    returnByValue: true
+  });
+  if (mobile.result.value.overflow || mobile.result.value.menu === 'none') throw new Error(`Dashboard mobile smoke test failed: ${JSON.stringify(mobile.result.value)}`);
+  const mobileShot = await client.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+  const mobilePath = join(screenshotRoot, 'dashboard-mobile.png');
+  writeFileSync(mobilePath, Buffer.from(mobileShot.data, 'base64'));
   let resumeImport = null;
   if (resumeFixture) {
     if (!existsSync(resumeFixture)) throw new Error(`Resume fixture does not exist: ${resumeFixture}`);
@@ -146,7 +203,7 @@ try {
       throw new Error(`Resume import did not persist structured experiences: ${JSON.stringify(resumeImport.applied)}`);
     }
   }
-  console.log(JSON.stringify({ edge, extension, popup: value, resumeImport, profileRoot }, null, 2));
+  console.log(JSON.stringify({ edge, extension, popup: value, dashboard: dashboard.result.value, catalogFilters: filterValue, mobile: mobile.result.value, screenshots: [desktopPath, mobilePath], resumeImport, profileRoot }, null, 2));
   await client.send('Browser.close');
 } finally {
   client?.close();

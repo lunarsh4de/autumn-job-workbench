@@ -1,0 +1,31 @@
+{
+  "sources": [
+    {
+      "id": "jobhunter1-public",
+      "name": "秋招情报站公开岗位",
+      "type": "jobhunter1-json",
+      "url": "https://raw.githubusercontent.com/SharkT2th/Jobhunter1/main/docs/data/jobs.json",
+      "attribution": "https://github.com/SharkT2th/Jobhunter1",
+      "enabled": true,
+      "max_bytes": 15728640
+    },
+    {
+      "id": "legacy-new-grad-list",
+      "name": "New Grad Positions 公开清单（历史参考）",
+      "type": "new-grad-positions-json",
+      "url": "https://raw.githubusercontent.com/upupming/new-grad-positions/main/public/data-processed.json",
+      "attribution": "https://github.com/upupming/new-grad-positions",
+      "enabled": false,
+      "max_bytes": 5242880
+    },
+    {
+      "id": "your-public-markdown-list",
+      "name": "自定义公开秋招 Markdown 表格",
+      "type": "markdown-table",
+      "url": "https://raw.githubusercontent.com/OWNER/REPOSITORY/main/README.md",
+      "attribution": "https://github.com/OWNER/REPOSITORY",
+      "enabled": false,
+      "max_bytes": 5242880
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+name: Publish job workbench
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0,6 * * *"
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare static site
+        run: |
+          mkdir -p _site/icons
+          python scripts/refresh_jobs.py --sources job-sources/sources.json --output _site/jobs.json --allow-partial
+          cp resume-quick-apply/dashboard.html _site/index.html
+          cp resume-quick-apply/dashboard.css resume-quick-apply/dashboard.js resume-quick-apply/dashboard-data.js resume-quick-apply/catalog.js resume-quick-apply/catalog-data.js resume-quick-apply/catalog-db.js _site/
+          cp resume-quick-apply/icons/*.svg _site/icons/
+          touch _site/.nojekyll
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

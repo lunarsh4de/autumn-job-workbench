@@ -1,0 +1,48 @@
+categories:
+  identity:
+    - name: company
+      description: normalized company name
+      detail_level: brief
+    - name: title
+      description: job title or campus program title
+      detail_level: brief
+    - name: location
+      description: city, work location or remote status
+      detail_level: brief
+  source:
+    - name: url
+      description: original public job detail URL
+      detail_level: brief
+    - name: platform
+      description: official site, public platform, school, community or imported source
+      detail_level: moderate
+    - name: published_at
+      description: source publication date when available
+      detail_level: brief
+    - name: deadline
+      description: application deadline when available
+      detail_level: brief
+  classification:
+    - name: job_type
+      description: campus, internship, conversion or social recruitment
+      detail_level: brief
+    - name: tags
+      description: role, domain, skill and hiring program tags
+      detail_level: moderate
+    - name: description
+      description: public job description or source notes
+      detail_level: detailed
+  local_only:
+    - name: match_score
+      description: deterministic score from user-entered local preferences
+      detail_level: moderate
+    - name: pipeline_stage
+      description: local tracking stage after adding to application board
+      detail_level: brief
+    - name: personal_notes
+      description: interview notes and next actions; never included in public feeds
+      detail_level: detailed
+uncertain:
+  - source freshness
+  - duplicate company naming
+  - third-party redistribution rights

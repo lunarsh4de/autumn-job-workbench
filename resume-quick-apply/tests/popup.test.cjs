@@ -46,12 +46,12 @@ test('invalid backup leaves both saved and edited data intact', async t => {
   assert.deepEqual(h.data.resume, pdf);
   assert.equal(h.document.querySelector('[name=name]').value, '保留');
 });
-test('oversized JSON is rejected before reading it', async t => {
+test('oversized multi-profile JSON is rejected before reading it', async t => {
   const h = await popup(t, { profile: { name: '保留' } });
-  importFile(h, { profile: { name: '不应导入' } }, 6 * 1024 * 1024);
+  importFile(h, { profile: { name: '不应导入' } }, 65 * 1024 * 1024);
   await until(() => !h.document.querySelector('#import-button').disabled);
   assert.equal(h.data.profile.name, '保留');
-  assert.match(h.document.querySelector('#message').textContent, /5 MB/);
+  assert.match(h.document.querySelector('#message').textContent, /64 MB/);
 });
 test('export includes most recent edit even when autosave has not completed', async t => {
   const h = await popup(t, { resume: pdf });
@@ -70,7 +70,40 @@ test('export includes most recent edit even when autosave has not completed', as
   assert.deepEqual(result.experiences, {
     work: [], education: [], projects: [], competitions: [], awards: [], campus: [], languages: [], publications: []
   });
-  assert.equal(result.schemaVersion, 3);
+  assert.equal(result.schemaVersion, 4);
+  assert.equal(result.resumeProfiles.length, 1);
+  assert.deepEqual(result.applications, []);
+});
+
+test('new resume profile keeps the previous profile available', async t => {
+  const h = await popup(t, { profile: { name: '产品候选人' } });
+  h.w.prompt = () => '交互设计版';
+  h.document.querySelector('#new-resume-profile').click();
+  await until(() => h.data.resumeProfiles?.length === 2);
+  assert.equal(h.data.profile.name, '');
+  assert.equal(h.document.querySelector('#resume-profile-select').selectedOptions[0].textContent, '交互设计版');
+  h.document.querySelector('#resume-profile-select').value = h.data.resumeProfiles[0].id;
+  h.document.querySelector('#resume-profile-select').dispatchEvent(new h.w.Event('change', { bubbles: true }));
+  await until(() => h.data.activeProfileId === h.data.resumeProfiles[0].id);
+  assert.equal(h.data.profile.name, '产品候选人');
+  assert.equal(h.data.resumeProfiles.length, 2);
+});
+
+test('resume import can create a parallel profile without overwriting current profile', async t => {
+  const h = await popup(t, { profile: { name: '旧档案' } });
+  const field = h.document.querySelector('#resume-import-file');
+  const text = '新档案姓名\nnew@example.com\n工作经历\n新公司 | 产品经理\n2023.01 - 至今\n负责产品';
+  Object.defineProperty(field, 'files', { configurable: true, value: [{ name: 'product.txt', size: text.length, async text() { return text; } }] });
+  field.dispatchEvent(new h.w.Event('change', { bubbles: true }));
+  await until(() => !h.document.querySelector('#resume-import-preview').hidden);
+  const toggle = h.document.querySelector('#resume-import-new-profile');
+  toggle.checked = true;
+  toggle.dispatchEvent(new h.w.Event('change', { bubbles: true }));
+  h.document.querySelector('#resume-import-apply').click();
+  await until(() => h.data.resumeProfiles?.length === 2 && h.data.profile.name === '新档案姓名');
+  const old = h.data.resumeProfiles.find(item => item.label === '默认简历');
+  assert.equal(old.profile.name, '旧档案');
+  assert.equal(h.data.resumeProfiles.find(item => item.id === h.data.activeProfileId).profile.name, '新档案姓名');
 });
 test('experience cards add, edit and remove structured entries', async t => {
   const h = await popup(t, {});
@@ -172,7 +205,7 @@ test('history tolerates damaged entries and only creates web links', async t => 
 test('application history exports a BOM-prefixed CSV with status and source', async t => {
   const h = await popup(t, { applications: [{
     url: 'https://jobs.example.test/job/1', title: '产品经理', company: '示例科技',
-    status: 'submitted', source: 'auto', createdAt: Date.now()
+    status: 'submitted', source: 'auto', resumeProfileId: 'product', resumeProfileLabel: '产品经理版', createdAt: Date.now()
   }] });
   let exported;
   h.w.Blob = Blob;
@@ -187,6 +220,7 @@ test('application history exports a BOM-prefixed CSV with status and source', as
   assert.match(csv, /示例科技/);
   assert.match(csv, /已投递/);
   assert.match(csv, /自动确认/);
+  assert.match(csv, /产品经理版/);
   assert.match(csv, /https:\/\/jobs\.example\.test\/job\/1/);
 });
 test('history groups applications by company and exports a company summary', async t => {

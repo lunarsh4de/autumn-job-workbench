@@ -186,7 +186,10 @@ test('single section textarea receives all entries while empty structured sectio
 });
 
 test('submission is recorded only after a visible success result appears', async t => {
-  const h = content(t, '<main><h1>测试产品经理</h1><form><input name="email"><button type="submit">提交申请</button></form></main>');
+  const h = content(t, '<main><h1>测试产品经理</h1><form><input name="email"><button type="submit">提交申请</button></form></main>', {
+    activeProfileId: 'product',
+    resumeProfiles: [{ id: 'product', label: '产品经理版', profile: {}, settings: {}, experiences: {} }]
+  });
   h.document.querySelector('form').dispatchEvent(new h.w.Event('submit', { bubbles: true, cancelable: true }));
   await new Promise(resolve => setTimeout(resolve, 10));
   assert.equal(h.writes.length, 0);
@@ -200,6 +203,8 @@ test('submission is recorded only after a visible success result appears', async
   assert.equal(h.data.applications[0].company, 'jobs.example.test');
   assert.equal(h.data.applications[0].status, 'submitted');
   assert.equal(h.data.applications[0].source, 'auto');
+  assert.equal(h.data.applications[0].resumeProfileId, 'product');
+  assert.equal(h.data.applications[0].resumeProfileLabel, '产品经理版');
 });
 
 test('company identity ignores generic Moka metadata and normalizes DJI career hosts', async t => {

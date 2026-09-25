@@ -5,11 +5,35 @@ const { content, popup, source, until } = require('./helpers.cjs');
 
 test('manifest uses temporary active-tab access without persistent host permission', () => {
   const manifest = JSON.parse(source('manifest.json'));
-  assert.deepEqual(manifest.permissions.sort(), ['activeTab', 'contextMenus', 'scripting', 'storage'].sort());
+  assert.equal(manifest.version, '0.15.0');
+  assert.equal(manifest.homepage_url, 'https://github.com/lunarsh4de');
+  assert.deepEqual(manifest.permissions.sort(), ['activeTab', 'contextMenus', 'scripting', 'storage', 'unlimitedStorage'].sort());
   assert.equal(manifest.host_permissions, undefined);
   assert.equal(manifest.content_scripts, undefined);
   assert.deepEqual(manifest.web_accessible_resources[0].matches, ['http://*/*', 'https://*/*']);
   assert.equal(manifest.commands['quick-fill'].suggested_key.default, 'Alt+Shift+F');
+});
+
+test('release surfaces show the current version and author link', () => {
+  assert.match(source('popup.html'), /v0\.15\.0/);
+  assert.match(source('popup.js'), /0\.15\.0/);
+  assert.match(source('onboarding.html'), /v0\.15\.0/);
+  assert.match(source('install/install-guide.html'), /v0\.15\.0/);
+  for (const file of ['popup.html', 'onboarding.html', 'dashboard.html', 'install/install-guide.html']) {
+    assert.match(source(file), /https:\/\/github\.com\/lunarsh4de/);
+    assert.match(source(file), /target="_blank" rel="noopener noreferrer"/);
+  }
+  assert.doesNotMatch(source('onboarding.html'), /<script/i);
+});
+
+test('Chinese install guide follows the three-step Edge flow without nested screenshots', () => {
+  const guide = source('install/install-guide.html');
+  assert.match(guide, /管理扩展/);
+  assert.match(guide, /开发人员模式/);
+  assert.match(guide, /加载解压缩的扩展/);
+  assert.match(guide, /ResumeQuickApply/);
+  assert.match(guide, /不要双击进入 Extension/);
+  assert.doesNotMatch(guide, /01-install-helper\.png|04-extension-loaded\.png|capture-clean/);
 });
 
 test('reinjecting content script is idempotent', t => {
@@ -37,9 +61,16 @@ test('popup injects scripts on demand when an existing page has no listener', as
   assert.equal(h.document.querySelector('#message').textContent, '按需注入成功');
 });
 
-test('runtime files contain no remote network transports', () => {
-  const runtime = ['data.js', 'resume-parser.js', 'popup.js', 'content.js', 'service-worker.js'].map(source).join('\n');
+test('core extension runtime contains no remote network transports', () => {
+  const runtime = ['data.js', 'resume-parser.js', 'popup.js', 'dashboard-data.js', 'dashboard.js', 'catalog-data.js', 'catalog-db.js', 'content.js', 'service-worker.js'].map(source).join('\n');
   assert.doesNotMatch(runtime, /\bfetch\s*\(|XMLHttpRequest|WebSocket|sendBeacon/);
+});
+
+test('catalog remote import is explicit, HTTPS-only and omits credentials', () => {
+  const catalog = source('catalog.js');
+  assert.match(catalog, /url\.protocol !== 'https:'/);
+  assert.match(catalog, /credentials: 'omit'/);
+  assert.doesNotMatch(catalog, /Authorization|Bearer|chrome\.identity/);
 });
 
 test('resume parsers are self-hosted with licenses and no remote script tags', () => {
@@ -49,6 +80,7 @@ test('resume parsers are self-hosted with licenses and no remote script tags', (
     assert.ok(readFileSync(path.join(root, file)).length > 1000, `${file} is missing or unexpectedly small`);
   }
   assert.doesNotMatch(source('popup.html'), /<script[^>]+src=["']https?:/i);
+  assert.doesNotMatch(source('dashboard.html'), /<script[^>]+src=["']https?:/i);
 });
 
 test('first-install onboarding opens only for install, not update', () => {
@@ -68,10 +100,11 @@ test('first-install onboarding opens only for install, not update', () => {
   assert.deepEqual(calls, [{ url: 'chrome-extension://test/onboarding.html' }]);
 });
 
-test('installer script is ASCII and supports validation-only mode', () => {
+test('installer script uses Chinese guidance and supports validation-only mode', () => {
   const installer = readFileSync(require('node:path').join(__dirname, '..', 'install', 'Install-ResumeQuickApply.ps1'));
-  assert.ok([...installer].every(byte => byte < 128));
-  assert.match(installer.toString('ascii'), /ValidateOnly/);
-  assert.match(installer.toString('ascii'), /Developer mode/);
-  assert.match(installer.toString('ascii'), /vendorFiles/);
+  const text = installer.toString('utf8');
+  assert.match(text, /ValidateOnly/);
+  assert.match(text, /开发人员模式/);
+  assert.match(text, /Extension/);
+  assert.match(text, /vendorFiles/);
 });

@@ -44,14 +44,14 @@ async function sendToPage(tabId, state) {
 async function quickFill(candidateTab) {
   const tab = candidateTab?.id ? candidateTab : await getActiveTab();
   if (!tab?.id || !/^https?:\/\//i.test(tab.url || '')) throw new Error('当前页面不支持填充。');
-  const saved = await chrome.storage.local.get(['profile', 'resume', 'settings', 'experiences']);
+  const saved = await chrome.storage.local.get(['profile', 'resume', 'settings', 'experiences', 'activeProfileId', 'activeProfileLabel']);
   const profile = ResumeData.profile(saved.profile || {});
   const settings = ResumeData.settings(saved.settings);
   const experiences = ResumeData.experiences(saved.experiences);
   const resume = settings.quickAttachment ? ResumeData.resume(saved.resume) : null;
   const hasExperiences = Object.values(experiences).some(items => items.length);
   if (!Object.values(profile).some(value => value.trim()) && !resume && !hasExperiences) throw new Error('请先在插件中保存个人资料。');
-  const result = await sendToPage(tab.id, { profile, resume, experiences });
+  const result = await sendToPage(tab.id, { profile, resume, experiences, resumeProfileId: saved.activeProfileId || '', resumeProfileLabel: saved.activeProfileLabel || '默认简历' });
   if (!result || result.error) throw new Error(result?.error || '页面未返回填充结果。');
   showBadge(tab.id, String(Math.min(result.filled || 0, 99)), '#087f73', result.message);
   return result;

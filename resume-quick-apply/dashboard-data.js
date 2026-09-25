@@ -63,6 +63,8 @@
       nextActionAt: text(value.nextActionAt, 30),
       interviewAt: text(value.interviewAt, 30),
       notes: text(value.notes, 10000),
+      resumeProfileId: text(value.resumeProfileId, 80),
+      resumeProfileLabel: text(value.resumeProfileLabel, 80),
       source: value.source === 'extension' ? 'extension' : 'manual',
       createdAt,
       updatedAt
@@ -96,6 +98,8 @@
         company: companyFor(application),
         stage: 'applied',
         url,
+        resumeProfileId: text(application.resumeProfileId, 80),
+        resumeProfileLabel: text(application.resumeProfileLabel, 80),
         source: 'extension',
         createdAt: application.createdAt,
         updatedAt: application.createdAt

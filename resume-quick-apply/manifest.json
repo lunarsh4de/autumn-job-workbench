@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
   "name": "投简历助手",
-  "version": "0.12.2",
-  "description": "从简历分类多类经历，在招聘网站快速填充，记录已投岗位与公司，并支持本地 CSV 导出。",
-  "permissions": ["storage", "activeTab", "scripting", "contextMenus"],
+  "version": "0.15.0",
+  "description": "从简历分类多类经历，在招聘网站快速填充，并在本地秋招工作台管理岗位进度。",
+  "homepage_url": "https://github.com/lunarsh4de",
+  "permissions": ["storage", "unlimitedStorage", "activeTab", "scripting", "contextMenus"],
   "action": {
     "default_title": "投简历助手",
     "default_popup": "popup.html"

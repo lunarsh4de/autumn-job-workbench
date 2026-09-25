@@ -1,0 +1,35 @@
+topic: 2027 autumn campus job acquisition
+as_of: 2026-09-22
+assumptions:
+  time_range: current_public_sources
+  privacy: personal profiles, preferences, scores and application states remain local
+items:
+  - name: official company campus career pages
+    role: source of truth for job details and application links
+    acquisition: manual browsing, browser extension capture, permitted export
+  - name: National College Student Employment Service Platform
+    url: https://www.ncss.cn/
+    role: public campus recruitment and career service listings
+  - name: Guopin
+    url: https://www.iguopin.com/
+    role: state-owned and public-sector recruitment listings
+  - name: Nowcoder campus jobs
+    url: https://www.nowcoder.com/jobs/school
+    role: campus job listings, schedules and interview discussion
+  - name: Yingjiesheng
+    url: https://www.yingjiesheng.com/
+    role: broad campus recruitment aggregation
+  - name: Shixiseng
+    url: https://www.shixiseng.com/
+    role: internships and conversion opportunities
+  - name: university career centers and public accounts
+    role: regional and school-specific openings
+    acquisition: export public tables to CSV or JSON before import
+  - name: community GitHub lists
+    role: supplementary structured lists and public JSON feeds
+    caution: verify update time, license and original source before reuse
+execution:
+  storage: IndexedDB in browser origin
+  max_catalog_items: 50000
+  batch_size: local import
+  output_dir: ./results

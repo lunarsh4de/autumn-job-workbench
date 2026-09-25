@@ -16,7 +16,11 @@
             <p>Quick Apply</p>
           </div>
         </div>
-        <span class="local-badge"><img src="icons/shield-check.svg" alt="" />本地保存</span>
+        <div class="header-actions">
+          <span id="version-badge" class="version-badge">v0.15.0</span>
+          <span class="local-badge"><img src="icons/shield-check.svg" alt="" />本地保存</span>
+          <button id="open-dashboard" class="dashboard-button" type="button"><img src="icons/layout-dashboard.svg" alt="" />工作台</button>
+        </div>
       </header>
 
       <section class="page-context" aria-label="当前页面">
@@ -106,6 +110,16 @@
 
       <section class="tab-panel" id="panel-profile" role="tabpanel" aria-labelledby="tab-profile" hidden>
         <form id="profile-form">
+          <section class="profile-switcher" aria-label="岗位定制简历">
+            <div class="section-title-row compact"><div><p class="overline">RESUME PROFILES</p><h2>岗位定制简历</h2></div><span id="resume-profile-status" aria-live="polite"></span></div>
+            <div class="profile-switcher-controls">
+              <label>当前档案<select id="resume-profile-select" aria-label="选择当前简历档案"></select></label>
+              <button id="new-resume-profile" class="button secondary" type="button"><img src="icons/plus.svg" alt="" />新建</button>
+              <button id="rename-resume-profile" class="button quiet" type="button"><img src="icons/pencil.svg" alt="" />重命名</button>
+              <button id="delete-resume-profile" class="button quiet danger-text" type="button"><img src="icons/trash-2.svg" alt="" />删除</button>
+            </div>
+            <p class="profile-switcher-note">每份档案独立保存资料、经历和附件。切换档案后，网页填充会使用当前档案。</p>
+          </section>
           <div class="section-title-row compact">
             <div><p class="overline">PROFILE</p><h2>个人资料</h2></div>
             <span id="save-state" aria-live="polite"></span>
@@ -185,6 +199,8 @@
           <p id="resume-import-summary"></p>
           <label class="inline-check"><input id="resume-import-replace" type="checkbox" />替换已有经历和已填写的基础资料</label>
           <label id="resume-import-attachment-row" class="inline-check"><input id="resume-import-save-attachment" type="checkbox" checked />同时保存为投递附件</label>
+          <label class="inline-check"><input id="resume-import-new-profile" type="checkbox" />导入为新的简历档案，保留当前档案</label>
+          <label id="resume-import-profile-name-row" class="profile-name-row" hidden>新档案名称<input id="resume-import-profile-name" maxlength="80" placeholder="如：产品经理版" /></label>
           <div class="import-actions">
             <button id="resume-import-apply" class="button primary" type="button">应用分类结果</button>
             <button id="resume-import-cancel" class="button quiet" type="button">取消</button>
@@ -194,6 +210,7 @@
         <div id="experience-sections"></div>
       </section>
 
+      <footer class="author-credit">作者：<a href="https://github.com/lunarsh4de" target="_blank" rel="noopener noreferrer">Lunarsh4de · GitHub</a></footer>
     </main>
     <script src="vendor/mammoth.browser.min.js"></script>
     <script src="data.js"></script>

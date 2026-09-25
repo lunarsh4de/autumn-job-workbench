@@ -11,6 +11,18 @@ let experiencesRevision = 0;
 let currentExperiences = ResumeData.experiences();
 let importCandidate = null;
 let importRequest = 0;
+let currentResume = null;
+let resumeProfiles = [];
+let activeProfileId = '';
+
+const manifestVersion = globalThis.chrome?.runtime?.getManifest?.().version || '0.15.0';
+const versionBadge = document.querySelector('#version-badge');
+if (versionBadge) versionBadge.textContent = `v${manifestVersion}`;
+
+document.querySelector('#open-dashboard').addEventListener('click', () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html') });
+  window.close();
+});
 
 const experienceMeta = {
   work: {
@@ -70,6 +82,7 @@ function putProfile(profile) {
   updateCompleteness();
 }
 function showResume(resume) {
+  currentResume = resume ? ResumeData.resume(resume) : null;
   resumeName.textContent = resume?.name || '尚未选择';
   const status = document.querySelector('#resume-status');
   status.textContent = resume?.name ? '已就绪' : '未上传';
@@ -80,6 +93,89 @@ function showResume(resume) {
 }
 function putSettings(value) {
   quickAttachment.checked = ResumeData.settings(value).quickAttachment;
+}
+
+function profileId() {
+  return `resume-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+function profileLabelFromFile(name) {
+  return (name || '').replace(/\.[^.]+$/, '').trim().slice(0, 80) || `简历档案 ${resumeProfiles.length + 1}`;
+}
+function emptyExperiences() {
+  return ResumeData.experiences({});
+}
+function createResumeProfile(label, values = {}) {
+  const now = Date.now();
+  return ResumeData.resumeProfile({
+    id: profileId(), label: label.trim() || `简历档案 ${resumeProfiles.length + 1}`,
+    profile: values.profile || ResumeData.profile({}),
+    resume: values.resume || null,
+    settings: values.settings || ResumeData.settings({}),
+    experiences: values.experiences || emptyExperiences(),
+    createdAt: now, updatedAt: now
+  });
+}
+function activeResumeProfile() {
+  return resumeProfiles.find(item => item.id === activeProfileId) || resumeProfiles[0] || null;
+}
+function renderResumeProfiles() {
+  const select = document.querySelector('#resume-profile-select');
+  if (!select) return;
+  select.replaceChildren();
+  for (const item of resumeProfiles) {
+    const option = document.createElement('option');
+    option.value = item.id;
+    option.textContent = item.label;
+    option.selected = item.id === activeProfileId;
+    select.append(option);
+  }
+  const status = document.querySelector('#resume-profile-status');
+  if (status) status.textContent = `${resumeProfiles.length} 份档案`;
+}
+function variantPayload(variant) {
+  return {
+    profile: ResumeData.profile(variant.profile),
+    resume: ResumeData.resume(variant.resume),
+    settings: ResumeData.settings(variant.settings),
+    experiences: ResumeData.experiences(variant.experiences)
+  };
+}
+async function saveResumeProfileSet(nextProfiles, nextActiveId, options = {}) {
+  const profiles = ResumeData.resumeProfiles(nextProfiles);
+  if (!profiles.length) throw new Error('至少保留一份简历档案。');
+  const active = profiles.find(item => item.id === nextActiveId) || profiles[0];
+  const activeState = variantPayload(active);
+  resumeProfiles = profiles;
+  activeProfileId = active.id;
+  const storagePatch = { profile: activeState.profile, settings: activeState.settings, experiences: activeState.experiences, resumeProfiles: profiles, activeProfileId: active.id, activeProfileLabel: active.label };
+  if (options.includeResume !== false) storagePatch.resume = activeState.resume;
+  await chrome.storage.local.set(storagePatch);
+  putProfile(active.profile);
+  showResume(active.resume);
+  putSettings(active.settings);
+  currentExperiences = active.experiences;
+  renderExperiences();
+  renderResumeProfiles();
+  return active;
+}
+function persistActive(patch) {
+  return enqueue(() => {
+    const current = activeResumeProfile();
+    if (!current) throw new Error('当前没有可用的简历档案。');
+    const next = ResumeData.resumeProfile({ ...current, ...patch, id: current.id, label: current.label, createdAt: current.createdAt, updatedAt: Date.now() });
+    const nextProfiles = resumeProfiles.map(item => item.id === next.id ? next : item);
+    return saveResumeProfileSet(nextProfiles, next.id, { includeResume: Object.hasOwn(patch, 'resume') });
+  });
+}
+async function activateResumeProfile(id) {
+  await enqueue(() => Promise.resolve());
+  const profile = resumeProfiles.find(item => item.id === id);
+  if (!profile) throw new Error('找不到要切换的简历档案。');
+  await saveResumeProfileSet(resumeProfiles, profile.id);
+  clearPreview();
+  revision++;
+  experiencesRevision++;
+  document.querySelector('#resume-profile-status').textContent = `当前：${profile.label}`;
 }
 function lock(locked) {
   document.querySelectorAll('input, textarea, button').forEach(element => { element.disabled = locked || !loaded; });
@@ -160,8 +256,7 @@ function saveExperiences() {
   const experiences = ResumeData.experiences(currentExperiences);
   const currentRevision = ++experiencesRevision;
   document.querySelector('#experience-save-state').textContent = '正在保存…';
-  return enqueue(async () => {
-    await chrome.storage.local.set({ experiences });
+  return persistActive({ experiences }).then(() => {
     if (experiencesRevision === currentRevision) document.querySelector('#experience-save-state').textContent = '已保存';
     return experiences;
   }).catch(error => {
@@ -218,9 +313,7 @@ function saveProfile() {
   const profile = profileFromForm();
   const currentRevision = ++revision;
   saveState.textContent = '正在保存…';
-  // Write profile only; do not read or rewrite the attachment during typing.
-  return enqueue(async () => {
-    await chrome.storage.local.set({ profile });
+  return persistActive({ profile }).then(() => {
     if (revision === currentRevision) saveState.textContent = '已保存';
     return profile;
   }).catch(error => {
@@ -253,7 +346,7 @@ resumeFile.addEventListener('change', () => {
       await enqueue(async () => {
         if (file.size > ResumeData.maxResumeBytes) throw new Error('简历文件超过 3 MB。');
         const resume = ResumeData.resume({ name: file.name, dataUrl: await readFile(file) });
-        await chrome.storage.local.set({ resume });
+        await persistActive({ resume });
         showResume(resume);
       });
       flash('附件已保存。填表时仅选择明确标注的简历上传框。');
@@ -262,7 +355,7 @@ resumeFile.addEventListener('change', () => {
 });
 document.querySelector('#clear-resume').addEventListener('click', () => action(async () => {
   clearPreview();
-  await enqueue(() => chrome.storage.local.set({ resume: null }));
+  await persistActive({ resume: null });
   resumeFile.value = '';
   showResume(null);
   flash('已移除保存的简历附件。');
@@ -311,7 +404,7 @@ document.querySelector('#resume-import-file').addEventListener('change', event =
         attachment = ResumeData.resume({ name: file.name, dataUrl: await readFile(file) });
       }
       if (request !== importRequest) return;
-      importCandidate = { ...parsed, attachment };
+      importCandidate = { ...parsed, attachment, fileName: file.name };
       const counts = parsed.experiences;
       document.querySelector('#resume-import-summary').textContent =
         `识别 ${parsed.meta.detectedFields} 项基础资料、${counts.work.length} 段工作、${counts.education.length} 段教育、${counts.projects.length} 段项目、${counts.competitions.length} 段赛事、${counts.awards.length} 条获奖、${counts.campus.length} 段校园经历及 ${counts.languages.length + counts.publications.length} 条其他经历。应用前请核对分类结果。`;
@@ -329,8 +422,37 @@ document.querySelector('#resume-import-cancel').addEventListener('click', () => 
   document.querySelector('#resume-import-preview').hidden = true;
   flash('已取消本次分类导入。');
 });
+document.querySelector('#resume-import-new-profile').addEventListener('change', event => {
+  document.querySelector('#resume-import-profile-name-row').hidden = !event.target.checked;
+  if (event.target.checked && !document.querySelector('#resume-import-profile-name').value.trim() && importCandidate) {
+    document.querySelector('#resume-import-profile-name').value = profileLabelFromFile(importCandidate.fileName);
+  }
+});
 document.querySelector('#resume-import-apply').addEventListener('click', () => action(async () => {
   if (!importCandidate) throw new Error('请先选择并解析简历。');
+  const newProfile = document.querySelector('#resume-import-new-profile').checked;
+  if (newProfile) {
+    const label = document.querySelector('#resume-import-profile-name').value.trim() || profileLabelFromFile(importCandidate.fileName);
+    if (resumeProfiles.length >= ResumeData.maxResumeProfiles) throw new Error(`最多保存 ${ResumeData.maxResumeProfiles} 份简历档案。`);
+    const attachment = importCandidate.attachment && document.querySelector('#resume-import-save-attachment').checked ? importCandidate.attachment : null;
+    const profile = createResumeProfile(label, {
+      profile: importCandidate.profile,
+      resume: attachment,
+      settings: ResumeData.settings({}),
+      experiences: importCandidate.experiences
+    });
+    await saveResumeProfileSet([...resumeProfiles, profile], profile.id);
+    document.querySelector('#resume-import-preview').hidden = true;
+    document.querySelector('#resume-import-replace').checked = false;
+    document.querySelector('#resume-import-new-profile').checked = false;
+    document.querySelector('#resume-import-profile-name-row').hidden = true;
+    document.querySelector('#resume-import-profile-name').value = '';
+    importCandidate = null;
+    document.querySelector('#experience-save-state').textContent = '已保存';
+    saveState.textContent = '已保存';
+    flash(`已新建“${profile.label}”并切换到该简历档案，当前档案未被覆盖。`);
+    return;
+  }
   const replace = document.querySelector('#resume-import-replace').checked;
   const existingProfile = profileFromForm();
   const profile = ResumeData.profile(Object.fromEntries(ResumeData.fields.map(key => [
@@ -341,7 +463,7 @@ document.querySelector('#resume-import-apply').addEventListener('click', () => a
   ])));
   const patch = { profile, experiences };
   if (importCandidate.attachment && document.querySelector('#resume-import-save-attachment').checked) patch.resume = importCandidate.attachment;
-  await enqueue(() => chrome.storage.local.set(patch));
+  await persistActive(patch);
   revision++;
   experiencesRevision++;
   putProfile(profile);
@@ -350,6 +472,9 @@ document.querySelector('#resume-import-apply').addEventListener('click', () => a
   if (patch.resume) showResume(patch.resume);
   document.querySelector('#resume-import-preview').hidden = true;
   document.querySelector('#resume-import-replace').checked = false;
+  document.querySelector('#resume-import-new-profile').checked = false;
+  document.querySelector('#resume-import-profile-name-row').hidden = true;
+  document.querySelector('#resume-import-profile-name').value = '';
   importCandidate = null;
   document.querySelector('#experience-save-state').textContent = '已保存';
   saveState.textContent = '已保存';
@@ -357,11 +482,43 @@ document.querySelector('#resume-import-apply').addEventListener('click', () => a
 }));
 quickAttachment.addEventListener('change', () => action(async () => {
   const settings = ResumeData.settings({ quickAttachment: quickAttachment.checked });
-  await enqueue(() => chrome.storage.local.set({ settings }));
+  await persistActive({ settings });
   flash(settings.quickAttachment
     ? '快捷键和右键填充将同时选择简历附件，请留意网站上传状态。'
     : '快捷键和右键填充只填写资料字段。');
 }));
+
+document.querySelector('#resume-profile-select').addEventListener('change', event => action(async () => {
+  await activateResumeProfile(event.target.value);
+  flash(`已切换到“${activeResumeProfile().label}”，填充将使用这份简历。`);
+}));
+document.querySelector('#new-resume-profile').addEventListener('click', () => action(async () => {
+  if (resumeProfiles.length >= ResumeData.maxResumeProfiles) throw new Error(`最多保存 ${ResumeData.maxResumeProfiles} 份简历档案。`);
+  const label = window.prompt('请输入新简历档案名称', `简历档案 ${resumeProfiles.length + 1}`);
+  if (label == null) return;
+  const profile = createResumeProfile(label);
+  await saveResumeProfileSet([...resumeProfiles, profile], profile.id);
+  flash(`已新建“${profile.label}”，当前资料与旧简历相互独立。`);
+}));
+document.querySelector('#rename-resume-profile').addEventListener('click', () => action(async () => {
+  const current = activeResumeProfile();
+  if (!current) throw new Error('当前没有可重命名的简历档案。');
+  const label = window.prompt('请输入新的简历档案名称', current.label);
+  if (label == null || !label.trim()) return;
+  const next = ResumeData.resumeProfile({ ...current, label: label.trim(), updatedAt: Date.now() });
+  await saveResumeProfileSet(resumeProfiles.map(item => item.id === current.id ? next : item), current.id);
+  flash(`已将当前档案重命名为“${next.label}”。`);
+}));
+document.querySelector('#delete-resume-profile').addEventListener('click', () => {
+  const current = activeResumeProfile();
+  if (!current || resumeProfiles.length <= 1) { flash('至少保留一份简历档案。', true); return; }
+  if (!window.confirm(`确认删除“${current.label}”？该档案的资料、经历和附件都会删除。`)) return;
+  action(async () => {
+    const remaining = resumeProfiles.filter(item => item.id !== current.id);
+    await saveResumeProfileSet(remaining, remaining[0].id);
+    flash(`已删除“${current.label}”。`);
+  });
+});
 
 async function sendToPage(type, state) {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -385,7 +542,7 @@ async function sendToPage(type, state) {
 document.querySelector('#preview-button').addEventListener('click', () => action(async () => {
   clearPreview();
   await saveProfile();
-  const state = await enqueue(() => chrome.storage.local.get(['profile', 'resume', 'experiences']));
+  const state = { ...await enqueue(() => chrome.storage.local.get(['profile', 'resume', 'experiences'])), resumeProfileId: activeProfileId, resumeProfileLabel: activeResumeProfile()?.label || '' };
   const result = await sendToPage('previewResume', state);
   const list = document.querySelector('#preview-list');
   list.replaceChildren();
@@ -419,7 +576,7 @@ form.addEventListener('submit', event => {
   action(async () => {
     clearPreview();
     await saveProfile();
-    const state = await enqueue(() => chrome.storage.local.get(['profile', 'resume', 'experiences']));
+    const state = { ...await enqueue(() => chrome.storage.local.get(['profile', 'resume', 'experiences'])), resumeProfileId: activeProfileId, resumeProfileLabel: activeResumeProfile()?.label || '' };
     const hasExperiences = Object.values(ResumeData.experiences(state.experiences)).some(items => items.length);
     if (!Object.values(state.profile).some(value => value.trim()) && !state.resume && !hasExperiences) throw new Error('请先填写资料、经历或选择简历。');
     const result = await sendToPage('fillResume', state);
@@ -428,8 +585,19 @@ form.addEventListener('submit', event => {
 });
 document.querySelector('#export-button').addEventListener('click', () => action(async () => {
   await saveProfile();
-  const state = await enqueue(() => chrome.storage.local.get(['profile', 'resume', 'settings', 'experiences']));
-  const blob = new Blob([JSON.stringify({ schemaVersion: 3, ...state, settings: ResumeData.settings(state.settings), experiences: ResumeData.experiences(state.experiences) }, null, 2)], { type: 'application/json' });
+  const state = await enqueue(() => chrome.storage.local.get(['profile', 'resume', 'settings', 'experiences', 'resumeProfiles', 'activeProfileId', 'applications']));
+  const profiles = ResumeData.resumeProfiles(state.resumeProfiles || resumeProfiles);
+  const active = profiles.find(item => item.id === (state.activeProfileId || activeProfileId)) || profiles[0];
+  const blob = new Blob([JSON.stringify({
+    schemaVersion: 4,
+    profile: active.profile,
+    resume: active.resume,
+    settings: active.settings,
+    experiences: active.experiences,
+    resumeProfiles: profiles,
+    activeProfileId: active.id,
+    applications: ResumeData.applications(state.applications)
+  }, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -438,7 +606,7 @@ document.querySelector('#export-button').addEventListener('click', () => action(
   link.click();
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-  flash('已导出最新资料及附件。备份包含个人信息，请妥善保管。');
+  flash(`已导出 ${profiles.length} 份简历档案、附件及 ${ResumeData.applications(state.applications).length} 条关联投递记录。备份包含个人信息，请妥善保管。`);
 }));
 document.querySelector('#import-button').addEventListener('click', () => document.querySelector('#import-file').click());
 document.querySelector('#import-file').addEventListener('change', event => {
@@ -446,22 +614,41 @@ document.querySelector('#import-file').addEventListener('change', event => {
   if (!file) return;
   action(async () => {
     try {
-      if (file.size > ResumeData.maxImportBytes) throw new Error('备份超过 5 MB，无法导入。');
+      if (file.size > ResumeData.maxImportBytes) throw new Error('备份超过 64 MB，无法导入。');
       const imported = ResumeData.backup(JSON.parse(await file.text()));
-      await enqueue(() => chrome.storage.local.set(imported));
+      const sourceProfiles = imported.resumeProfiles?.length ? imported.resumeProfiles : [createResumeProfile(profileLabelFromFile(file.name), imported)];
+      const importedProfiles = sourceProfiles.map((item, index) => ResumeData.resumeProfile({
+        ...item,
+        id: profileId(),
+        label: `${item.label || profileLabelFromFile(file.name)}（导入${sourceProfiles.length > 1 ? ` ${index + 1}` : ''}）`.trim(),
+        createdAt: Date.now(), updatedAt: Date.now()
+      }));
+      if (resumeProfiles.length + importedProfiles.length > ResumeData.maxResumeProfiles) throw new Error(`导入后最多保留 ${ResumeData.maxResumeProfiles} 份简历档案。`);
+      const importedActiveId = importedProfiles[Math.max(0, sourceProfiles.findIndex(item => item.id === imported.activeProfileId))]?.id || importedProfiles[0].id;
+      await saveResumeProfileSet([...resumeProfiles, ...importedProfiles], importedActiveId);
+      const profileMap = new Map(sourceProfiles.map((item, index) => [item.id, importedProfiles[index]]));
+      const importedApplications = ResumeData.applications(imported.applications).map(item => {
+        const mapped = profileMap.get(item.resumeProfileId);
+        return mapped ? { ...item, resumeProfileId: mapped.id, resumeProfileLabel: mapped.label } : item;
+      });
+      if (importedApplications.length) {
+        const saved = await chrome.storage.local.get(['applications']);
+        const existing = ResumeData.applications(saved.applications);
+        const seen = new Set(existing.map(item => `${item.url}|${item.createdAt}`));
+        const applications = [...existing, ...importedApplications.filter(item => !seen.has(`${item.url}|${item.createdAt}`))]
+          .sort((a, b) => b.createdAt - a.createdAt).slice(0, 500);
+        await chrome.storage.local.set({ applications });
+        renderHistory(applications);
+        renderCompanies(applications);
+      }
       revision++;
       clearPreview();
-      putProfile(imported.profile);
-      showResume(imported.resume);
-      putSettings(imported.settings);
-      currentExperiences = imported.experiences;
-      renderExperiences();
       importCandidate = null;
       document.querySelector('#resume-import-preview').hidden = true;
       resumeFile.value = '';
       saveState.textContent = '已保存';
       loaded = true;
-      flash('资料已导入，缺省字段已清空。');
+      flash(`已并行导入 ${importedProfiles.length} 份简历档案及 ${importedApplications.length} 条关联投递记录，当前档案未被覆盖。`);
     } finally { event.target.value = ''; }
   });
 });
@@ -489,16 +676,22 @@ function applicationCompany(application) {
     return typeof application.company === 'string' && application.company.trim() ? application.company.trim() : '未知公司';
   }
 }
+function applicationProfile(application) {
+  return typeof application.resumeProfileLabel === 'string' && application.resumeProfileLabel.trim()
+    ? application.resumeProfileLabel.trim() : '未标记档案';
+}
 function companySummary(applications) {
   const groups = new Map();
   for (const application of validApplications(applications)) {
     const company = applicationCompany(application);
-    const group = groups.get(company) || { company, count: 0, submitted: 0, latest: 0, titles: [] };
+    const group = groups.get(company) || { company, count: 0, submitted: 0, latest: 0, titles: [], profiles: [] };
     group.count++;
     if (application.status === 'submitted') group.submitted++;
     group.latest = Math.max(group.latest, application.createdAt);
     const title = typeof application.title === 'string' ? application.title.trim() : '';
     if (title && !group.titles.includes(title)) group.titles.push(title);
+    const profile = applicationProfile(application);
+    if (!group.profiles.includes(profile)) group.profiles.push(profile);
     groups.set(company, group);
   }
   return [...groups.values()].sort((a, b) => b.latest - a.latest || a.company.localeCompare(b.company));
@@ -510,10 +703,11 @@ document.querySelector('#export-history').addEventListener('click', () => action
   const state = await enqueue(() => chrome.storage.local.get(['applications']));
   const applications = validApplications(state.applications);
   if (!applications.length) throw new Error('还没有可导出的投递记录。');
-  const rows = [['投递时间', '岗位', '公司或站点', '状态', '记录方式', '链接'], ...applications.map(item => [
+  const rows = [['投递时间', '岗位', '公司或站点', '使用简历档案', '状态', '记录方式', '链接'], ...applications.map(item => [
     new Date(item.createdAt).toLocaleString('zh-CN'),
     typeof item.title === 'string' ? item.title : '',
     typeof item.company === 'string' ? item.company : '',
+    applicationProfile(item),
     item.status === 'submitted' ? '已投递' : '已记录',
     item.source === 'auto' ? '自动确认' : '手动标记',
     item.url
@@ -533,8 +727,8 @@ document.querySelector('#export-companies').addEventListener('click', () => acti
   const state = await enqueue(() => chrome.storage.local.get(['applications']));
   const companies = companySummary(state.applications);
   if (!companies.length) throw new Error('还没有可导出的公司记录。');
-  const rows = [['公司', '投递岗位数', '已确认投递数', '最近投递时间', '岗位列表'], ...companies.map(item => [
-    item.company, item.count, item.submitted, new Date(item.latest).toLocaleString('zh-CN'), item.titles.join('；')
+  const rows = [['公司', '投递岗位数', '已确认投递数', '最近投递时间', '使用简历档案', '岗位列表'], ...companies.map(item => [
+    item.company, item.count, item.submitted, new Date(item.latest).toLocaleString('zh-CN'), item.profiles.join('；'), item.titles.join('；')
   ])];
   const blob = new Blob(['\ufeff' + rows.map(row => row.map(csvCell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -566,7 +760,7 @@ function renderHistory(applications) {
     const detail = document.createElement('span');
     detail.className = 'application-detail';
     const company = applicationCompany(application);
-    detail.textContent = `${application.status === 'submitted' ? '已投递' : '已记录'} · ${company}`;
+    detail.textContent = `${application.status === 'submitted' ? '已投递' : '已记录'} · ${company} · 简历：${applicationProfile(application)}`;
     copy.append(title, detail);
     const date = document.createElement('span');
     date.className = 'application-meta';
@@ -594,7 +788,7 @@ function renderCompanies(applications) {
     name.title = company.company;
     const detail = document.createElement('div');
     detail.className = 'company-detail';
-    detail.textContent = `${company.count} 个岗位 · 已确认 ${company.submitted} 个${company.titles.length ? ` · ${company.titles.slice(0, 2).join('、')}${company.titles.length > 2 ? '等' : ''}` : ''}`;
+    detail.textContent = `${company.count} 个岗位 · 已确认 ${company.submitted} 个${company.profiles.length ? ` · 简历：${company.profiles.slice(0, 2).join('、')}${company.profiles.length > 2 ? '等' : ''}` : ''}${company.titles.length ? ` · ${company.titles.slice(0, 2).join('、')}${company.titles.length > 2 ? '等' : ''}` : ''}`;
     copy.append(name, detail);
     const meta = document.createElement('span');
     meta.className = 'company-meta';
@@ -659,18 +853,33 @@ async function loadPageContext() {
 }
 lock(true);
 loadPageContext();
-chrome.storage.local.get(['profile', 'resume', 'applications', 'settings', 'experiences']).then(state => {
-  const profile = ResumeData.profile(state.profile || {});
+chrome.storage.local.get(['profile', 'resume', 'applications', 'settings', 'experiences', 'resumeProfiles', 'activeProfileId']).then(async state => {
+  resumeProfiles = ResumeData.resumeProfiles(state.resumeProfiles);
+  if (!resumeProfiles.length) {
+    const legacy = createResumeProfile('默认简历', {
+      profile: ResumeData.profile(state.profile || {}),
+      resume: ResumeData.resume(state.resume),
+      settings: ResumeData.settings(state.settings),
+      experiences: ResumeData.experiences(state.experiences)
+    });
+    resumeProfiles = [legacy];
+    activeProfileId = legacy.id;
+  } else {
+    activeProfileId = resumeProfiles.some(item => item.id === state.activeProfileId) ? state.activeProfileId : resumeProfiles[0].id;
+  }
+  const active = activeResumeProfile();
+  const profile = active.profile;
   putProfile(profile);
-  showResume(state.resume);
-  putSettings(state.settings);
-  currentExperiences = ResumeData.experiences(state.experiences);
+  showResume(active.resume);
+  putSettings(active.settings);
+  currentExperiences = active.experiences;
+  renderResumeProfiles();
   renderExperiences();
   renderHistory(state.applications);
   renderCompanies(state.applications);
   loaded = true;
   lock(false);
-  if (!Object.values(profile).some(value => value.trim()) && !state.resume) {
+  if (!Object.values(profile).some(value => value.trim()) && !active.resume) {
     selectTab('quick');
     flash('首次使用：先上传简历自动整理资料，也可以在“资料”页手动填写。');
   }
