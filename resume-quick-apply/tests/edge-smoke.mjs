@@ -175,23 +175,24 @@ try {
   if (resumeFixture) {
     if (!existsSync(resumeFixture)) throw new Error(`Resume fixture does not exist: ${resumeFixture}`);
     await client.send('DOM.enable');
+    await client.send('Runtime.evaluate', { expression: `document.querySelector('[data-view="sources"]').click()` });
+    await waitForEvaluation(client, `!!document.querySelector('#dashboard-resume-file')`);
     const documentNode = await client.send('DOM.getDocument');
-    const input = await client.send('DOM.querySelector', { nodeId: documentNode.root.nodeId, selector: '#resume-import-file' });
+    const input = await client.send('DOM.querySelector', { nodeId: documentNode.root.nodeId, selector: '#dashboard-resume-file' });
     if (!input.nodeId) throw new Error('Resume import file input was not found.');
     await client.send('DOM.setFileInputFiles', { nodeId: input.nodeId, files: [resumeFixture] });
-    await client.send('Runtime.evaluate', { expression: `document.querySelector('#resume-import-file').dispatchEvent(new Event('change', {bubbles:true}))` });
+    await client.send('Runtime.evaluate', { expression: `document.querySelector('#dashboard-resume-file').dispatchEvent(new Event('change', {bubbles:true}))` });
     resumeImport = await waitForEvaluation(client, `(() => {
-      const preview=document.querySelector('#resume-import-preview');
-      const message=document.querySelector('#message');
-      if (!preview.hidden) return {ok:true,summary:document.querySelector('#resume-import-summary').textContent};
-      if (!message.hidden && message.dataset.error==='true') return {ok:false,error:message.textContent};
+      const preview=document.querySelector('#dashboard-resume-preview');
+      const status=document.querySelector('#dashboard-resume-status');
+      if (!preview.hidden) return {ok:true,summary:preview.textContent};
+      if (/解析失败/.test(status.textContent)) return {ok:false,error:status.textContent};
       return null;
     })()`);
     if (!resumeImport.ok) throw new Error(`Resume import failed: ${resumeImport.error}`);
-    await client.send('Runtime.evaluate', { expression: `document.querySelector('#resume-import-apply').click()` });
+    await client.send('Runtime.evaluate', { expression: `document.querySelector('#dashboard-resume-apply').click()` });
     await waitForEvaluation(client, `(() => {
-      const message=document.querySelector('#message');
-      return document.querySelector('#resume-import-preview').hidden && /分类结果已导入/.test(message.textContent);
+      return /已应用/.test(document.querySelector('#dashboard-resume-status').textContent);
     })()`);
     const stored = await client.send('Runtime.evaluate', {
       expression: `(async()=>{const s=await chrome.storage.local.get(['profile','experiences','resume']);return {name:s.profile?.name||'',work:s.experiences?.work?.length||0,education:s.experiences?.education?.length||0,projects:s.experiences?.projects?.length||0,competitions:s.experiences?.competitions?.length||0,awards:s.experiences?.awards?.length||0,campus:s.experiences?.campus?.length||0,languages:s.experiences?.languages?.length||0,publications:s.experiences?.publications?.length||0,attachment:s.resume?.name||''};})()`,
