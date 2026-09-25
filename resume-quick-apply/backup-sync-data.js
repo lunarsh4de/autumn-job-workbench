@@ -18,15 +18,18 @@
     const source = record(value?.data) ? value.data : value;
     if (!record(source) || !globalThis.ResumeData?.backup) throw new Error('备份格式不正确或解析组件未加载。');
     const normalized = ResumeData.backup(source);
-    const patch = { ...normalized };
-    if (Object.hasOwn(source, 'activeProfileLabel')) patch.activeProfileLabel = text(source.activeProfileLabel, 80);
-    if (Object.hasOwn(source, 'jobTrackerItems')) {
-      if (!globalThis.TrackerData?.items) throw new Error('工作台数据组件未加载。');
-      patch.jobTrackerItems = TrackerData.items(source.jobTrackerItems);
-    }
-    if (Object.hasOwn(source, 'jobSearchPreferences')) patch.jobSearchPreferences = preferences(source.jobSearchPreferences);
-    if (Object.hasOwn(source, 'resumeAutoPreferences')) patch.resumeAutoPreferences = preferences(source.resumeAutoPreferences);
-    return patch;
+    if (!globalThis.TrackerData?.items) throw new Error('工作台数据组件未加载。');
+    const profiles = normalized.resumeProfiles || [];
+    const activeProfile = profiles.find(item => item.id === normalized.activeProfileId) || profiles[0];
+    return {
+      ...normalized,
+      resumeProfiles: profiles,
+      activeProfileId: normalized.activeProfileId || activeProfile?.id || null,
+      activeProfileLabel: text(source.activeProfileLabel, 80) || activeProfile?.label || null,
+      jobTrackerItems: TrackerData.items(source.jobTrackerItems || []),
+      jobSearchPreferences: preferences(source.jobSearchPreferences),
+      resumeAutoPreferences: preferences(source.resumeAutoPreferences)
+    };
   }
 
   const api = { prepare, preferences };

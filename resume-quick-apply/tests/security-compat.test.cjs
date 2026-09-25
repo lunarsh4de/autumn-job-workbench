@@ -104,6 +104,19 @@ test('GitHub backup restore rejects malformed wrapped payloads before writes', (
   assert.throws(() => BackupSyncData.prepare({ data: { profile: { name: {} } } }), /字段|格式/);
 });
 
+test('GitHub backup restore clears optional local state omitted by older backups', () => {
+  globalThis.ResumeData = require('../data.js');
+  globalThis.TrackerData = require('../dashboard-data.js');
+  const BackupSyncData = require('../backup-sync-data.js');
+  const patch = BackupSyncData.prepare({ profile: { name: '旧格式备份' } });
+  assert.deepEqual(patch.resumeProfiles, []);
+  assert.equal(patch.activeProfileId, null);
+  assert.equal(patch.activeProfileLabel, null);
+  assert.deepEqual(patch.jobTrackerItems, []);
+  assert.deepEqual(patch.jobSearchPreferences, { roles: '', skills: '', cities: '' });
+  assert.deepEqual(patch.resumeAutoPreferences, { roles: '', skills: '', cities: '' });
+});
+
 test('resume parsers are self-hosted with licenses and no remote script tags', () => {
   const path = require('node:path');
   const root = path.join(__dirname, '..', 'vendor');
