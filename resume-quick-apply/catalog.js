@@ -16,6 +16,7 @@
   let pendingResumeSync = false;
   let resumeSyncGeneration = 0;
   let detailTrigger = null;
+  let importTrigger = null;
 
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -289,12 +290,23 @@
     dashboard.flash('匹配偏好已保存，岗位评分已更新。');
   }
 
-  function showImport() {
+  function showImport(trigger = null) {
+    importTrigger = trigger && typeof trigger.focus === 'function' ? trigger : null;
     const dialog = document.querySelector('#import-dialog');
     const result = document.querySelector('#import-result');
     result.hidden = true;
     result.dataset.error = 'false';
     dialog.showModal();
+    document.querySelector('#catalog-paste')?.focus();
+  }
+
+  function scheduleImportFocusRestore() {
+    const trigger = importTrigger;
+    importTrigger = null;
+    if (!trigger) return;
+    setTimeout(() => {
+      if (trigger.isConnected) trigger.focus();
+    }, 0);
   }
 
   function setPublicStatus(text, state = '', detail = '') {
@@ -430,10 +442,17 @@
   }
 
   function installEvents() {
-    document.querySelector('#open-import').addEventListener('click', showImport);
-    document.querySelectorAll('[data-open-import]').forEach(button => button.addEventListener('click', showImport));
-    document.querySelector('#close-import').addEventListener('click', () => document.querySelector('#import-dialog').close());
-    document.querySelector('#cancel-import').addEventListener('click', () => document.querySelector('#import-dialog').close());
+    document.querySelector('#open-import').addEventListener('click', event => showImport(event.currentTarget));
+    document.querySelectorAll('[data-open-import]').forEach(button => button.addEventListener('click', event => showImport(event.currentTarget)));
+    document.querySelector('#close-import').addEventListener('click', () => {
+      document.querySelector('#import-dialog').close();
+      scheduleImportFocusRestore();
+    });
+    document.querySelector('#cancel-import').addEventListener('click', () => {
+      document.querySelector('#import-dialog').close();
+      scheduleImportFocusRestore();
+    });
+    document.querySelector('#import-dialog').addEventListener('close', scheduleImportFocusRestore);
     document.querySelector('#import-form').addEventListener('submit', event => {
       event.preventDefault();
       importJobs().catch(error => dashboard.flash(error.message || '导入失败。', true));

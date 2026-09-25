@@ -126,6 +126,12 @@ try {
   });
   await client.send('Page.navigate', { url: `chrome-extension://${extensionId}/dashboard.html` });
   await waitForEvaluation(client, `document.querySelectorAll('#view-catalog .metric-card').length===4 && document.querySelector('#catalog-total').textContent!=='0'`);
+  const editorFocus = await client.send('Runtime.evaluate', {
+    expression: `(async()=>{const trigger=document.querySelector('#new-job');trigger?.click();const opened=document.querySelector('#job-dialog')?.open && document.activeElement?.name==='company';document.querySelector('#cancel-dialog')?.click();await new Promise(resolve=>setTimeout(resolve,50));return {opened,restored:document.activeElement===trigger};})()`,
+    awaitPromise: true,
+    returnByValue: true
+  });
+  if (!editorFocus.result.value.opened || !editorFocus.result.value.restored) throw new Error(`Job editor focus smoke test failed: ${JSON.stringify(editorFocus.result.value)}`);
   const publicStatus = await waitForEvaluation(client, `(() => { const node=document.querySelector('#public-sync-status'); const button=document.querySelector('#sync-public-catalog'); return node && node.dataset.state !== 'loading' ? {state:node.dataset.state,text:node.textContent,title:node.title,syncButtonEnabled:!button.disabled} : null; })()`);
   if (!publicStatus || /Failed to fetch|NetworkError|Load failed/i.test(`${publicStatus.text} ${publicStatus.title}`)) throw new Error(`Public source status smoke test failed: ${JSON.stringify(publicStatus)}`);
   if (!publicStatus.syncButtonEnabled || (publicStatus.state === 'ready' && !/来源 \d+\/\d+ 正常/.test(publicStatus.text))) throw new Error(`Public source health status failed: ${JSON.stringify(publicStatus)}`);
@@ -133,6 +139,12 @@ try {
   if (emptyResumeStatus !== '尚未检测到插件简历') throw new Error(`Empty resume status smoke test failed: ${JSON.stringify(emptyResumeStatus)}`);
   await client.send('Runtime.evaluate', { expression: `chrome.storage.local.set({profile:{name:'测试候选人',city:'上海',skills:'SQL'},experiences:{work:[{role:'产品经理',location:'上海'}]},activeProfileLabel:'产品版'})`, awaitPromise: true });
   const syncedResumeStatus = await waitForEvaluation(client, `(() => { const node=document.querySelector('#resume-sync-status'); return node?.dataset.state === 'ready' && /产品版/.test(node.textContent) ? node.textContent : null; })()`);
+  const importFocus = await client.send('Runtime.evaluate', {
+    expression: `(async()=>{const trigger=document.querySelector('#open-import');trigger?.click();const opened=document.querySelector('#import-dialog')?.open && document.activeElement?.id==='catalog-paste';document.querySelector('#cancel-import')?.click();await new Promise(resolve=>setTimeout(resolve,50));return {opened,restored:document.activeElement===trigger};})()`,
+    awaitPromise: true,
+    returnByValue: true
+  });
+  if (!importFocus.result.value.opened || !importFocus.result.value.restored) throw new Error(`Catalog import focus smoke test failed: ${JSON.stringify(importFocus.result.value)}`);
   await client.send('Runtime.evaluate', {
       expression: `(()=>{document.querySelector('#open-import').click();const input=document.querySelector('#catalog-paste');input.value='公司,岗位,地点,链接,平台,标签,企业类型,岗位类型\\n示例科技,数据分析师,上海,https://jobs.example.test/imported,公开清单,"SQL,Python",外企（中国大陆）,数据算法';input.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#import-form').requestSubmit();})()`
   });

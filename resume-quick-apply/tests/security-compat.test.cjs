@@ -157,6 +157,17 @@ test('catalog import exposes an in-dialog error state and prevents concurrent su
   assert.match(css, /\.import-result\[data-error="true"\]/);
 });
 
+test('job and catalog import dialogs restore focus to their launch controls', () => {
+  const dashboard = source('dashboard.js');
+  const catalog = source('catalog.js');
+  assert.match(dashboard, /let editorTrigger = null/);
+  assert.match(dashboard, /openEditor\(undefined, event\.currentTarget\)/);
+  assert.match(dashboard, /scheduleEditorFocusRestore/);
+  assert.match(catalog, /let importTrigger = null/);
+  assert.match(catalog, /showImport\(event\.currentTarget\)/);
+  assert.match(catalog, /scheduleImportFocusRestore/);
+});
+
 test('catalog empty results offer a direct filter reset action', () => {
   const catalog = source('catalog.js');
   assert.match(catalog, /data-reset-catalog/);

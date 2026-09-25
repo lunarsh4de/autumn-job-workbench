@@ -2,6 +2,7 @@
   const TD = globalThis.TrackerData;
   const storage = createStorage();
   const state = { items: [], query: '', view: 'catalog', boardPriority: 'all', jobsStage: 'all', jobsSort: 'updated' };
+  let editorTrigger = null;
   const stageById = Object.fromEntries(TD.stages.map(stage => [stage.id, stage]));
   const stageColors = { watch: '#75838b', preparing: '#ad741b', applied: '#3970cf', assessment: '#7459b7', interview: '#bd6b19', offer: '#24805d', closed: '#8b9499' };
   const dateFormat = new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit' });
@@ -456,7 +457,8 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function openEditor(entry) {
+  function openEditor(entry, trigger = null) {
+    editorTrigger = trigger && typeof trigger.focus === 'function' ? trigger : null;
     const form = document.querySelector('#job-form');
     form.reset();
     form.elements.namedItem('priority').value = 'normal';
@@ -476,6 +478,16 @@
 
   function closeEditor() {
     document.querySelector('#job-dialog').close();
+    scheduleEditorFocusRestore();
+  }
+
+  function scheduleEditorFocusRestore() {
+    const trigger = editorTrigger;
+    editorTrigger = null;
+    if (!trigger) return;
+    setTimeout(() => {
+      if (trigger.isConnected) trigger.focus();
+    }, 0);
   }
 
   async function saveForm() {
@@ -589,9 +601,10 @@
       setSidebarOpen(false);
       mobileMenu.focus();
     });
-    document.querySelector('#new-job').addEventListener('click', () => openEditor());
+    document.querySelector('#new-job').addEventListener('click', event => openEditor(undefined, event.currentTarget));
     document.querySelector('#close-dialog').addEventListener('click', closeEditor);
     document.querySelector('#cancel-dialog').addEventListener('click', closeEditor);
+    document.querySelector('#job-dialog').addEventListener('close', scheduleEditorFocusRestore);
     document.querySelector('#delete-job').addEventListener('click', () => deleteCurrent().catch(error => flash(error.message, true)));
     document.querySelector('#job-form').addEventListener('submit', event => {
       event.preventDefault();
@@ -609,7 +622,7 @@
       const target = event.target.closest('[data-edit-id]');
       if (!target) return;
       const entry = state.items.find(item => item.id === target.dataset.editId);
-      if (entry) openEditor(entry);
+      if (entry) openEditor(entry, target);
     });
     document.querySelector('#kanban').addEventListener('dragstart', event => {
       const card = event.target.closest('.job-card');
