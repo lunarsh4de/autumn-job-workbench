@@ -128,6 +128,16 @@
     await storage.set({ githubGistToken: token, githubGistRefreshToken: result.refresh_token || stored.githubGistRefreshToken, githubGistExpiresAt: result.expires_in ? Date.now() + Number(result.expires_in) * 1000 : 0 });
   }
 
+  async function discoverBackupGist() {
+    const gists = await github('/gists?per_page=100');
+    const matches = (Array.isArray(gists) ? gists : []).filter(gist => gist?.description === GIST_DESCRIPTION && gist.files?.[FILE_NAME]);
+    matches.sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
+    const gist = matches[0];
+    if (!gist?.id) return null;
+    const updatedAt = Date.parse(gist.updated_at || '');
+    return { id: gist.id, updatedAt: Number.isFinite(updatedAt) ? updatedAt : null };
+  }
+
   async function connect() {
     signIn.disabled = true;
     signIn.setAttribute('aria-busy', 'true');
@@ -140,9 +150,19 @@
       token = login.token;
       const user = await github('/user');
       const latest = await storage.get(['githubGistRefreshToken', 'githubGistExpiresAt', 'githubGistId', 'githubBackupAt']);
+      let gistId = latest.githubGistId || '';
+      let backupAt = latest.githubBackupAt;
+      if (!gistId) {
+        const discovered = await discoverBackupGist().catch(() => null);
+        if (discovered) {
+          gistId = discovered.id;
+          backupAt = discovered.updatedAt || backupAt;
+          await storage.set({ githubGistId: gistId, githubBackupAt: backupAt || null });
+        }
+      }
       await storage.set({ githubGistToken: token, githubGistRefreshToken: latest.githubGistRefreshToken || login.refreshToken || null, githubGistExpiresAt: latest.githubGistExpiresAt || login.expiresAt || 0, githubUserLogin: user.login });
-      setConnectedUi(user.login, latest.githubGistId || '');
-      setStatus(backupStatus(user.login, latest.githubGistId || '', latest.githubBackupAt));
+      setConnectedUi(user.login, gistId);
+      setStatus(backupStatus(user.login, gistId, backupAt));
     } catch (error) {
       token = '';
       setStatus(`GitHub 连接失败：${error.message}`, true);
@@ -255,8 +275,18 @@
     try {
       const user = await github('/user');
       const latest = await storage.get(['githubGistId', 'githubBackupAt']);
-      setConnectedUi(user.login, latest.githubGistId || '');
-      setStatus(backupStatus(user.login, latest.githubGistId || '', latest.githubBackupAt));
+      let gistId = latest.githubGistId || '';
+      let backupAt = latest.githubBackupAt;
+      if (!gistId) {
+        const discovered = await discoverBackupGist().catch(() => null);
+        if (discovered) {
+          gistId = discovered.id;
+          backupAt = discovered.updatedAt || backupAt;
+          await storage.set({ githubGistId: gistId, githubBackupAt: backupAt || null });
+        }
+      }
+      setConnectedUi(user.login, gistId);
+      setStatus(backupStatus(user.login, gistId, backupAt));
     } catch { token = ''; await storage.set({ githubGistToken: null, githubGistRefreshToken: null, githubGistExpiresAt: null, githubUserLogin: null }); setConnectedUi(''); }
   }).then(() => {
     if (!token) updateProfileUi('');

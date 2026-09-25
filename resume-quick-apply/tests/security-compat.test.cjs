@@ -132,6 +132,10 @@ test('GitHub sync preserves refreshed token metadata and reports backup freshnes
   assert.match(sync, /authCancelled = false/);
   assert.match(sync, /GitHub 授权已取消/);
   assert.match(sync, /当前设备与私有 Gist 的绑定已解除/);
+  assert.match(sync, /async function discoverBackupGist/);
+  assert.match(sync, /gist\?\.description === GIST_DESCRIPTION && gist\.files\?\.\[FILE_NAME\]/);
+  assert.match(sync, /github\('\/gists\?per_page=100'\)/);
+  assert.match(sync, /await discoverBackupGist\(\)\.catch\(\(\) => null\)/);
   assert.match(source('dashboard.html'), /id="github-cancel"/);
 });
 
