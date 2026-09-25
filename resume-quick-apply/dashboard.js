@@ -427,7 +427,10 @@
     const backdrop = document.querySelector('#sidebar-backdrop');
     if (!sidebar) return;
     const isOpen = Boolean(open);
+    const isMobile = Boolean(window.matchMedia?.('(max-width: 760px)').matches);
     sidebar.classList.toggle('open', isOpen);
+    sidebar.toggleAttribute('inert', isMobile && !isOpen);
+    sidebar.setAttribute('aria-hidden', String(isMobile && !isOpen));
     if (toggle) {
       toggle.setAttribute('aria-expanded', String(isOpen));
       toggle.setAttribute('aria-label', isOpen ? '关闭导航' : '打开导航');
@@ -640,6 +643,10 @@
       if (globalThis.chrome?.runtime?.id && globalThis.chrome?.tabs?.create) {
         chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
       } else showView('sources');
+    });
+    setSidebarOpen(false);
+    window.addEventListener('resize', () => {
+      if (!sidebar.classList.contains('open')) setSidebarOpen(false);
     });
   }
 

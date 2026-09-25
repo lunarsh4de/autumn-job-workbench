@@ -205,21 +205,22 @@ try {
       const menu=document.querySelector('#mobile-menu');
       const sidebar=document.querySelector('#sidebar');
       const backdrop=document.querySelector('#sidebar-backdrop');
-      const before={expanded:menu.getAttribute('aria-expanded'),label:menu.getAttribute('aria-label')};
+      window.dispatchEvent(new Event('resize'));
+      const before={expanded:menu.getAttribute('aria-expanded'),label:menu.getAttribute('aria-label'),ariaHidden:sidebar.getAttribute('aria-hidden'),inert:sidebar.hasAttribute('inert')};
       menu.click();
-      const opened={expanded:menu.getAttribute('aria-expanded'),label:menu.getAttribute('aria-label'),open:sidebar.classList.contains('open'),backdropVisible:!backdrop.hidden};
+      const opened={expanded:menu.getAttribute('aria-expanded'),label:menu.getAttribute('aria-label'),open:sidebar.classList.contains('open'),backdropVisible:!backdrop.hidden,ariaHidden:sidebar.getAttribute('aria-hidden'),inert:sidebar.hasAttribute('inert')};
       document.querySelector('[data-view="profile"]').click();
-      const navigated={expanded:menu.getAttribute('aria-expanded'),open:sidebar.classList.contains('open'),backdropVisible:!backdrop.hidden,focus:document.activeElement===menu,viewVisible:document.querySelector('#view-profile').hidden===false};
+      const navigated={expanded:menu.getAttribute('aria-expanded'),open:sidebar.classList.contains('open'),backdropVisible:!backdrop.hidden,ariaHidden:sidebar.getAttribute('aria-hidden'),inert:sidebar.hasAttribute('inert'),focus:document.activeElement===menu,viewVisible:document.querySelector('#view-profile').hidden===false};
       menu.click();
       document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
       const escaped={expanded:menu.getAttribute('aria-expanded'),label:menu.getAttribute('aria-label'),open:sidebar.classList.contains('open'),backdropVisible:!backdrop.hidden};
       menu.click();
       backdrop.click();
-      return {overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,menu:getComputedStyle(menu).display,sidebar:getComputedStyle(sidebar).transform,toastBottom:getComputedStyle(document.querySelector('#toast')).bottom,before,opened,navigated,escaped,closed:{expanded:menu.getAttribute('aria-expanded'),label:menu.getAttribute('aria-label'),open:sidebar.classList.contains('open'),backdropVisible:!backdrop.hidden},focus:document.activeElement===menu};
+      return {overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,menu:getComputedStyle(menu).display,sidebar:getComputedStyle(sidebar).transform,toastBottom:getComputedStyle(document.querySelector('#toast')).bottom,before,opened,navigated,escaped,closed:{expanded:menu.getAttribute('aria-expanded'),label:menu.getAttribute('aria-label'),open:sidebar.classList.contains('open'),backdropVisible:!backdrop.hidden,ariaHidden:sidebar.getAttribute('aria-hidden'),inert:sidebar.hasAttribute('inert')},focus:document.activeElement===menu};
     })()`,
     returnByValue: true
   });
-  if (mobile.result.value.overflow || mobile.result.value.menu === 'none' || mobile.result.value.toastBottom !== '16px' || mobile.result.value.before.expanded !== 'false' || !mobile.result.value.opened.open || !mobile.result.value.opened.backdropVisible || mobile.result.value.opened.expanded !== 'true' || mobile.result.value.escaped.open || mobile.result.value.escaped.backdropVisible || mobile.result.value.closed.open || mobile.result.value.closed.expanded !== 'false' || mobile.result.value.closed.backdropVisible || !mobile.result.value.focus || !mobile.result.value.navigated.viewVisible || mobile.result.value.navigated.open || mobile.result.value.navigated.backdropVisible || !mobile.result.value.navigated.focus) throw new Error(`Dashboard mobile smoke test failed: ${JSON.stringify(mobile.result.value)}`);
+  if (mobile.result.value.overflow || mobile.result.value.menu === 'none' || mobile.result.value.toastBottom !== '16px' || mobile.result.value.before.expanded !== 'false' || mobile.result.value.before.ariaHidden !== 'true' || !mobile.result.value.before.inert || !mobile.result.value.opened.open || !mobile.result.value.opened.backdropVisible || mobile.result.value.opened.expanded !== 'true' || mobile.result.value.opened.ariaHidden !== 'false' || mobile.result.value.opened.inert || mobile.result.value.escaped.open || mobile.result.value.escaped.backdropVisible || mobile.result.value.closed.open || mobile.result.value.closed.expanded !== 'false' || mobile.result.value.closed.backdropVisible || mobile.result.value.closed.ariaHidden !== 'true' || !mobile.result.value.closed.inert || !mobile.result.value.focus || !mobile.result.value.navigated.viewVisible || mobile.result.value.navigated.open || mobile.result.value.navigated.backdropVisible || mobile.result.value.navigated.ariaHidden !== 'true' || !mobile.result.value.navigated.inert || !mobile.result.value.navigated.focus) throw new Error(`Dashboard mobile smoke test failed: ${JSON.stringify(mobile.result.value)}`);
   const mobileShot = await client.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
   const mobilePath = join(screenshotRoot, 'dashboard-mobile.png');
   writeFileSync(mobilePath, Buffer.from(mobileShot.data, 'base64'));
