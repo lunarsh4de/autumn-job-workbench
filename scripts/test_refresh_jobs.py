@@ -1,4 +1,5 @@
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -36,6 +37,26 @@ class RefreshJobsTests(unittest.TestCase):
             self.assertEqual(result["meta"]["total"], 1)
             self.assertEqual(result["meta"]["sources"][0]["status"], "ok")
             self.assertEqual(json.loads(output_path.read_text(encoding="utf-8"))["jobs"][0]["company"], "甲")
+
+    def test_build_keeps_first_source_when_urls_overlap(self):
+        config = {"sources": [
+            {"id": "official", "name": "公司校园招聘官网", "type": "standard-json", "url": "https://example.com/official", "enabled": True},
+            {"id": "aggregate", "name": "公开聚合", "type": "standard-json", "url": "https://example.com/aggregate", "enabled": True},
+        ]}
+        responses = {
+            "https://example.com/official": [{"company": "甲", "title": "研发工程师", "url": "https://company.example/job/1", "platform": "公司校园招聘官网"}],
+            "https://example.com/aggregate": [{"company": "甲", "title": "研发工程师", "url": "https://company.example/job/1", "platform": "牛客"}],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config_path = root / "sources.json"
+            output_path = root / "jobs.json"
+            config_path.write_text(json.dumps(config, ensure_ascii=False), encoding="utf-8")
+            with patch.object(refresh_jobs, "get_json", side_effect=lambda url, _max_bytes: responses[url]):
+                result = refresh_jobs.build(config_path, output_path, False)
+        self.assertEqual(result["meta"]["total"], 1)
+        self.assertEqual(result["jobs"][0]["platform"], "公司校园招聘官网")
+        self.assertEqual(result["jobs"][0]["sourceId"], "official")
 
     def test_normalize_classifies_role_and_derives_region(self):
         job = refresh_jobs.normalize({"company": "示例", "title": "数据分析师", "location": "浙江省杭州市余杭区"}, {"id": "test", "name": "测试源", "url": "https://example.com"})
@@ -83,6 +104,71 @@ class RefreshJobsTests(unittest.TestCase):
         self.assertEqual(rows[0]["description"], " Build\xa0products ")
         normalized = refresh_jobs.normalize(rows[0], source)
         self.assertEqual(normalized["companyType"], "外企（中国大陆）")
+
+    def test_tencent_campus_adapter_builds_real_detail_links(self):
+        source = {
+            "id": "tencent", "name": "腾讯校园招聘官网", "type": "tencent-campus", "enabled": True,
+            "company": "腾讯", "url": "https://example.com/tencent", "page_size": 100,
+        }
+        response = {"data": {"count": 1, "positionList": [{
+            "positionTitle": "AI全栈工程师", "workCities": "深圳总部 北京 ",
+            "projectName": "应届毕业生", "recruitLabelName": "应届毕业生", "postId": "123",
+        }]}}
+        with patch.object(refresh_jobs, "post_json", return_value=response):
+            jobs = refresh_jobs.collect(source)
+        self.assertEqual(jobs[0]["url"], "https://join.qq.com/post.html?postid=123")
+        self.assertEqual(jobs[0]["platform"], "腾讯校园招聘官网")
+
+    def test_meituan_campus_adapter_keeps_job_description(self):
+        source = {
+            "id": "meituan", "name": "美团校园招聘官网", "type": "meituan-campus", "enabled": True,
+            "company": "美团", "url": "https://example.com/meituan", "page_size": 100,
+        }
+        response = {"data": {"page": {"totalCount": 1}, "list": [{
+            "jobUnionId": "456", "name": "后端开发工程师", "jobStatus": "000",
+            "cityList": [{"name": "北京市"}], "jobFamily": "技术类", "jobFamilyGroup": "软件",
+            "jobDuty": "负责服务开发", "jobRequirement": "本科及以上", "refreshTime": 1786960999000,
+        }]}}
+        with patch.object(refresh_jobs, "post_json", return_value=response):
+            jobs = refresh_jobs.collect(source)
+        self.assertIn("jobUnionId=456", jobs[0]["url"])
+        self.assertIn("负责服务开发", jobs[0]["description"])
+
+    def test_byd_campus_adapter_uses_2027_official_positions(self):
+        source = {
+            "id": "byd", "name": "比亚迪校园招聘官网", "type": "byd-campus", "enabled": True,
+            "company": "比亚迪", "url": "https://example.com/byd", "page_size": 100,
+        }
+        response = {"data": [{
+            "id": "789", "jobName": "高级车身集成工程师", "jobType": "研发技术",
+            "workPlace": "深圳市", "batch": 2027, "updateTime": "2026-09-13",
+        }], "page": {"totalCount": 1}}
+        with patch.object(refresh_jobs, "post_json", return_value=response):
+            jobs = refresh_jobs.collect(source)
+        self.assertIn("schoolPositionDetail?id=789", jobs[0]["url"])
+        self.assertIn("2027届", jobs[0]["tags"])
+
+    def test_moka_campus_uses_node_helper_and_job_route(self):
+        source = {
+            "id": "tesla", "name": "特斯拉校园招聘官网", "type": "moka-campus", "enabled": True,
+            "company": "特斯拉中国", "url": "https://example.com/campus", "detail_base_url": "https://example.com/campus",
+            "org_id": "tesla", "site_id": "41460",
+        }
+        helper_payload = {"jobs": [{
+            "id": "abc", "title": "2027届-软件开发实习生", "status": "open",
+            "locations": [{"provinceName": "上海市", "cityName": "浦东新区"}],
+            "publishedAt": "2026-09-28T14:20:14", "zhineng": {"name": "产品研发"},
+        }]}
+        completed = subprocess.CompletedProcess(["node"], 0, json.dumps(helper_payload, ensure_ascii=False), "")
+        with patch.object(refresh_jobs.subprocess, "run", return_value=completed):
+            jobs = refresh_jobs.collect(source)
+        self.assertEqual(jobs[0]["url"], "https://example.com/campus#/job/abc")
+        self.assertIn("实习", jobs[0]["tags"])
+
+    def test_enabled_config_has_real_official_sources_not_placeholders(self):
+        config = json.loads((Path(__file__).parents[1] / "job-sources" / "sources.json").read_text(encoding="utf-8"))
+        enabled = [source for source in config["sources"] if source.get("enabled")]
+        self.assertTrue({"tencent-campus", "meituan-campus", "byd-campus", "moka-campus"}.issubset({source["type"] for source in enabled}))
 
     def test_normalize_classifies_known_state_owned_employer(self):
         job = refresh_jobs.normalize({"company": "国家电网有限公司", "title": "技术研发", "location": "北京"}, {"id": "test", "name": "测试源", "url": "https://example.com"})

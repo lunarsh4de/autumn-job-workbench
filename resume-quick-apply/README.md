@@ -39,8 +39,9 @@
 
 ### 自动岗位源
 
-- [job-sources/sources.json](../job-sources/sources.json) 定义允许读取的公开 CSV、JSON 或 GitHub Markdown 表格；每个来源都可单独启用、停用和保留归属链接。
-- [scripts/refresh_jobs.py](../scripts/refresh_jobs.py) 负责下载、字段转换、过滤在招岗位和跨来源去重，只输出公开岗位字段。
+- [job-sources/sources.json](../job-sources/sources.json) 定义允许读取的数据源；当前直接同步腾讯、美团、特斯拉、比亚迪和吉利的校园招聘官网岗位明细，同时保留公开聚合源和中国大陆外企源作为补充。
+- [scripts/refresh_jobs.py](../scripts/refresh_jobs.py) 负责官网分页抓取、字段转换、过滤在招岗位和跨来源去重；Moka 官网由 [fetch_moka_jobs.mjs](../scripts/fetch_moka_jobs.mjs) 使用 Node 内置加密模块解码公开响应，不需要额外依赖。
+- 其他公司继续使用官网或公开源数据；只有已验证可稳定公开读取岗位明细的官网才进入自动 feed，不会把“校园招聘 / 实习岗位（官方入口）”当成真实岗位。
 - [pages.yml](../.github/workflows/pages.yml) 在北京时间每天 08:00、14:00 自动运行，也支持在 Actions 页面点击 `Run workflow` 一键刷新。
 - 公开来源不需要个人 Token。Actions 自带的 `GITHUB_TOKEN` 只用于工作流权限；当前构建甚至不需要把 Token 交给脚本。
 - Pages 打开后会读取同源 `jobs.json` 并写入访问者自己的 IndexedDB，六小时内不重复下载；“立即同步”可忽略缓存强制刷新。

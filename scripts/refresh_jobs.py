@@ -10,6 +10,7 @@ import html
 import io
 import json
 import re
+import subprocess
 import sys
 import urllib.request
 from datetime import datetime, timezone
@@ -17,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 
-USER_AGENT = "autumn-job-workbench/0.14 (+public feed builder)"
+USER_AGENT = "autumn-job-workbench/0.15 (+public feed builder)"
 
 JOB_TYPES = {"技术研发", "数据算法", "产品项目", "设计体验", "运营市场", "销售客户", "职能管培", "供应链制造", "金融法务", "教育医疗", "其他校招"}
 JOB_TYPE_RULES = [
@@ -122,6 +123,29 @@ def get_json(url: str, max_bytes: int) -> Any:
     return json.loads(payload.decode("utf-8-sig"))
 
 
+def post_json(url: str, body: dict[str, Any], max_bytes: int, headers: dict[str, str] | None = None) -> Any:
+    request_headers = {
+        "User-Agent": USER_AGENT,
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+    request_headers.update(headers or {})
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+        headers=request_headers,
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=45) as response:
+        length = int(response.headers.get("Content-Length") or 0)
+        if length and length > max_bytes:
+            raise ValueError(f"source is larger than configured max_bytes: {length}")
+        payload = response.read(max_bytes + 1)
+    if len(payload) > max_bytes:
+        raise ValueError("source exceeded configured max_bytes while downloading")
+    return json.loads(payload.decode("utf-8-sig"))
+
+
 def get_text(url: str, max_bytes: int) -> str:
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "text/csv,text/plain"})
     with urllib.request.urlopen(request, timeout=45) as response:
@@ -142,6 +166,8 @@ def normalize(job: dict[str, Any], source: dict[str, Any]) -> dict[str, Any] | N
     tags = job.get("tags") or []
     if isinstance(tags, str):
         tags = [part.strip() for part in tags.replace("，", ",").split(",") if part.strip()]
+    if isinstance(tags, list):
+        tags = [clean(tag, 80) for tag in tags if clean(tag, 80)]
     province, city = region_parts(job)
     explicit_company_type = clean(job.get("companyType"), 40) or clean(source.get("companyType"), 40)
     company_haystack = " ".join((company, " ".join(tags), clean(job.get("description"), 12000)))
@@ -165,7 +191,7 @@ def normalize(job: dict[str, Any], source: dict[str, Any]) -> dict[str, Any] | N
         "url": url,
         "platform": clean(job.get("platform"), 100) or source["name"],
         "jobType": classify_job_type({**job, "tags": " ".join(tags) if isinstance(tags, list) else tags}),
-        "tags": list(dict.fromkeys(clean(tag, 80) for tag in tags if clean(tag, 80)))[:20],
+        "tags": list(dict.fromkeys(tags))[:20] if isinstance(tags, list) else [],
         "description": clean(job.get("description")),
         "publishedAt": clean(job.get("publishedAt"), 30),
         "deadline": clean(job.get("deadline"), 30),
@@ -252,6 +278,224 @@ def adapt_greenhouse(payload: Any, source: dict[str, Any]) -> list[dict[str, Any
     return result
 
 
+def collect_tencent_campus(source: dict[str, Any], max_bytes: int) -> list[dict[str, Any]]:
+    page_size = min(max(int(source.get("page_size") or 100), 1), 100)
+    max_pages = min(max(int(source.get("max_pages") or 20), 1), 100)
+    max_jobs = min(max(int(source.get("max_jobs") or 2000), 1), 10000)
+    rows: list[dict[str, Any]] = []
+    total = None
+    for page_index in range(1, max_pages + 1):
+        request_body = {
+            "projectIdList": [],
+            "projectMappingIdList": source.get("project_mapping_ids") or [1, 2, 104, 14, 20],
+            "keyword": "",
+            "bgList": [],
+            "workCountryType": 0,
+            "workCityList": [],
+            "recruitCityList": [],
+            "positionFidList": [],
+            "pageIndex": page_index,
+            "pageSize": page_size,
+        }
+        response = post_json(source["url"], request_body, max_bytes, source.get("headers"))
+        data = response.get("data") if isinstance(response, dict) else None
+        batch = data.get("positionList", []) if isinstance(data, dict) else []
+        if not isinstance(batch, list):
+            raise ValueError("Tencent campus response has no positionList")
+        if total is None:
+            total = int(data.get("count") or 0)
+        for row in batch:
+            if not isinstance(row, dict) or not row.get("positionTitle"):
+                continue
+            post_id = clean(row.get("postId"), 100)
+            detail_template = source.get("detail_url_template") or "https://join.qq.com/post.html?postid={postId}"
+            work_cities = re.sub(r"\s+", " / ", clean(row.get("workCities"), 300)).strip(" / ")
+            tags = [row.get("projectName"), row.get("recruitLabelName")]
+            tags.extend(clean(row.get("bgs"), 300).split())
+            rows.append({
+                "company": source.get("company") or "腾讯",
+                "title": row.get("positionTitle"),
+                "location": work_cities,
+                "url": detail_template.format(postId=post_id, id=post_id),
+                "platform": source.get("name"),
+                "tags": tags,
+                "description": "",
+            })
+            if len(rows) >= max_jobs:
+                return rows
+        if not batch or len(batch) < page_size or (total and len(rows) >= total):
+            break
+    return rows
+
+
+def epoch_millis_to_iso(value: Any) -> str:
+    try:
+        return datetime.fromtimestamp(int(value) / 1000, tz=timezone.utc).isoformat()
+    except (TypeError, ValueError, OSError, OverflowError):
+        return ""
+
+
+def collect_meituan_campus(source: dict[str, Any], max_bytes: int) -> list[dict[str, Any]]:
+    page_size = min(max(int(source.get("page_size") or 100), 1), 100)
+    max_pages = min(max(int(source.get("max_pages") or 10), 1), 100)
+    max_jobs = min(max(int(source.get("max_jobs") or 1000), 1), 10000)
+    rows: list[dict[str, Any]] = []
+    total = None
+    for page_no in range(1, max_pages + 1):
+        request_body = {
+            "page": {"pageNo": page_no, "pageSize": page_size},
+            "jobShareType": "1",
+            "keywords": "",
+            "cityList": [],
+            "department": [],
+            "jfJgList": [],
+            "jobType": source.get("job_type") or [{"code": "1", "subCode": ["1"]}],
+            "typeCode": source.get("type_codes") or ["1"],
+            "specialCode": [],
+        }
+        response = post_json(source["url"], request_body, max_bytes, source.get("headers"))
+        data = response.get("data") if isinstance(response, dict) else None
+        batch = data.get("list", []) if isinstance(data, dict) else []
+        if not isinstance(batch, list):
+            raise ValueError("Meituan campus response has no job list")
+        if total is None:
+            page = data.get("page") or {}
+            total = int(page.get("totalCount") or 0) if isinstance(page, dict) else 0
+        for row in batch:
+            if not isinstance(row, dict) or not row.get("name") or row.get("jobStatus") not in (None, "000"):
+                continue
+            job_id = clean(row.get("jobUnionId"), 100)
+            detail_template = source.get("detail_url_template") or "https://zhaopin.meituan.com/web/position/detail?jobUnionId={jobUnionId}"
+            city_list = row.get("cityList") or []
+            location = " / ".join(
+                clean(city.get("name"), 80)
+                for city in city_list
+                if isinstance(city, dict) and clean(city.get("name"), 80)
+            )
+            description = "\n\n".join(filter(None, (clean(row.get("jobDuty")), clean(row.get("jobRequirement")))))
+            rows.append({
+                "company": source.get("company") or "美团",
+                "title": row.get("name"),
+                "location": location,
+                "url": detail_template.format(jobUnionId=job_id, id=job_id),
+                "platform": source.get("name"),
+                "tags": [row.get("jobFamily"), row.get("jobFamilyGroup"), "官网", "校招"],
+                "description": description,
+                "publishedAt": epoch_millis_to_iso(row.get("refreshTime")),
+            })
+            if len(rows) >= max_jobs:
+                return rows
+        if not batch or len(batch) < page_size or (total and len(rows) >= total):
+            break
+    return rows
+
+
+def collect_byd_campus(source: dict[str, Any], max_bytes: int) -> list[dict[str, Any]]:
+    page_size = min(max(int(source.get("page_size") or 100), 1), 200)
+    max_pages = min(max(int(source.get("max_pages") or 10), 1), 100)
+    max_jobs = min(max(int(source.get("max_jobs") or 1000), 1), 10000)
+    rows: list[dict[str, Any]] = []
+    total = None
+    for page_index in range(1, max_pages + 1):
+        request_body = {
+            "topicCode": "",
+            "batch": str(source.get("batch") or "2027"),
+            "campusNature": str(source.get("campus_nature") or "008501"),
+            "abroad": "",
+            "degree": "",
+            "jobType": [],
+            "researchDirection": [],
+            "workPlace": [],
+            "keywords": "",
+            "pageSize": page_size,
+            "pageIndex": page_index,
+        }
+        response = post_json(source["url"], request_body, max_bytes, source.get("headers"))
+        batch = response.get("data", []) if isinstance(response, dict) else []
+        if not isinstance(batch, list):
+            raise ValueError("BYD campus response has no job list")
+        if total is None:
+            page = response.get("page") or {}
+            total = int(page.get("totalCount") or 0) if isinstance(page, dict) else 0
+        for row in batch:
+            if not isinstance(row, dict) or not row.get("jobName"):
+                continue
+            job_id = clean(row.get("id"), 100)
+            detail_template = source.get("detail_url_template") or "https://job.byd.com/portal/pc/#/school/schoolPositionDetail?id={id}"
+            rows.append({
+                "company": source.get("company") or "比亚迪",
+                "title": row.get("jobName"),
+                "location": clean(row.get("workPlace"), 300).replace(",", " / "),
+                "url": detail_template.format(id=job_id),
+                "platform": source.get("name"),
+                "tags": [row.get("jobType"), f"{row.get('batch')}届", "官网", "校招"],
+                "description": "",
+                "publishedAt": row.get("updateTime"),
+            })
+            if len(rows) >= max_jobs:
+                return rows
+        if not batch or len(batch) < page_size or (total and len(rows) >= total):
+            break
+    return rows
+
+
+def collect_moka_campus(source: dict[str, Any]) -> list[dict[str, Any]]:
+    helper = Path(__file__).with_name("fetch_moka_jobs.mjs")
+    if not helper.exists():
+        raise FileNotFoundError(f"Moka helper not found: {helper}")
+    timeout_seconds = min(max(int(source.get("timeout_seconds") or 180), 30), 600)
+    result = subprocess.run(
+        ["node", str(helper)],
+        input=json.dumps(source, ensure_ascii=False),
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        timeout=timeout_seconds,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"Moka helper failed: {clean(result.stderr, 1000)}")
+    payload = json.loads(result.stdout)
+    jobs = payload.get("jobs", []) if isinstance(payload, dict) else []
+    if not isinstance(jobs, list):
+        raise ValueError("Moka helper returned no jobs list")
+    detail_base_url = clean(source.get("detail_base_url") or source.get("url"), 4000).split("#", 1)[0].rstrip("/")
+    rows = []
+    for row in jobs:
+        if not isinstance(row, dict) or row.get("status") not in (None, "open") or not row.get("title"):
+            continue
+        locations = []
+        for location in row.get("locations") or []:
+            if not isinstance(location, dict):
+                continue
+            province = clean(location.get("provinceName"), 80)
+            city = clean(location.get("cityName"), 80)
+            label = "-".join(dict.fromkeys(part for part in (province, city) if part))
+            if label:
+                locations.append(label)
+        title = clean(row.get("title"), 240)
+        zhineng = row.get("zhineng") or {}
+        tags = [
+            zhineng.get("name") if isinstance(zhineng, dict) else "",
+            row.get("education"),
+            row.get("commitment"),
+            "实习" if "实习" in title else "校招",
+            "官网",
+        ]
+        job_id = clean(row.get("id"), 120)
+        rows.append({
+            "company": source.get("company"),
+            "title": title,
+            "location": " / ".join(dict.fromkeys(locations)),
+            "url": f"{detail_base_url}#/job/{job_id}",
+            "platform": source.get("name"),
+            "tags": tags,
+            "description": "",
+            "publishedAt": row.get("publishedAt"),
+        })
+    return rows
+
+
 def adapt_csv(text: str) -> list[dict[str, Any]]:
     return list(csv.DictReader(io.StringIO(text)))
 
@@ -316,6 +560,14 @@ def collect(source: dict[str, Any]) -> list[dict[str, Any]]:
         rows = adapt_csv(get_text(source["url"], max_bytes))
     elif source_type == "markdown-table":
         rows = adapt_markdown_table(get_text(source["url"], max_bytes))
+    elif source_type == "tencent-campus":
+        rows = collect_tencent_campus(source, max_bytes)
+    elif source_type == "meituan-campus":
+        rows = collect_meituan_campus(source, max_bytes)
+    elif source_type == "byd-campus":
+        rows = collect_byd_campus(source, max_bytes)
+    elif source_type == "moka-campus":
+        rows = collect_moka_campus(source)
     else:
         payload = get_json(source["url"], max_bytes)
         adapters = {
@@ -341,7 +593,9 @@ def build(config_path: Path, output_path: Path, allow_partial: bool) -> dict[str
         try:
             jobs = collect(source)
             for job in jobs:
-                all_jobs[job["id"]] = job
+                # Sources are ordered by trust. Keep official career-site data
+                # when a later aggregation source contains the same URL.
+                all_jobs.setdefault(job["id"], job)
             status.append({"id": source["id"], "name": source["name"], "status": "ok", "count": len(jobs), "attribution": source.get("attribution")})
         except Exception as error:  # Network and source schema failures are reported per source.
             status.append({"id": source.get("id"), "name": source.get("name"), "status": "error", "count": 0, "error": str(error)[:500]})

@@ -1,6 +1,94 @@
 {
   "sources": [
     {
+      "id": "tencent-campus-official",
+      "name": "腾讯校园招聘官网",
+      "type": "tencent-campus",
+      "company": "腾讯",
+      "url": "https://join.qq.com/api/v1/position/searchPosition",
+      "detail_url_template": "https://join.qq.com/post.html?postid={postId}",
+      "attribution": "https://join.qq.com/",
+      "enabled": true,
+      "page_size": 100,
+      "max_pages": 20,
+      "max_jobs": 2000,
+      "max_bytes": 5242880,
+      "headers": {
+        "Origin": "https://join.qq.com",
+        "Referer": "https://join.qq.com/"
+      }
+    },
+    {
+      "id": "meituan-campus-official",
+      "name": "美团校园招聘官网",
+      "type": "meituan-campus",
+      "company": "美团",
+      "url": "https://zhaopin.meituan.com/api/official/job/getJobList",
+      "detail_url_template": "https://zhaopin.meituan.com/web/position/detail?jobUnionId={jobUnionId}&highlightType=campus",
+      "attribution": "https://zhaopin.meituan.com/web/position?hiringType=1_1",
+      "enabled": true,
+      "page_size": 100,
+      "max_pages": 10,
+      "max_jobs": 1000,
+      "max_bytes": 10485760,
+      "headers": {
+        "Origin": "https://zhaopin.meituan.com",
+        "Referer": "https://zhaopin.meituan.com/web/position?hiringType=1_1"
+      }
+    },
+    {
+      "id": "tesla-campus-official",
+      "name": "特斯拉校园招聘官网",
+      "type": "moka-campus",
+      "company": "特斯拉中国",
+      "url": "https://app.mokahr.com/campus-recruitment/tesla/41460?locale=zh-CN",
+      "detail_base_url": "https://app.mokahr.com/campus-recruitment/tesla/41460?locale=zh-CN",
+      "org_id": "tesla",
+      "site_id": "41460",
+      "attribution": "https://app.mokahr.com/campus-recruitment/tesla/41460?locale=zh-CN#/jobs",
+      "enabled": true,
+      "page_size": 50,
+      "max_pages": 10,
+      "max_jobs": 1000,
+      "timeout_seconds": 180
+    },
+    {
+      "id": "byd-campus-official",
+      "name": "比亚迪校园招聘官网",
+      "type": "byd-campus",
+      "company": "比亚迪",
+      "url": "https://job.byd.com/portal/api/portal-api/schoolPortal/queryPositionList",
+      "detail_url_template": "https://job.byd.com/portal/pc/#/school/schoolPositionDetail?id={id}",
+      "attribution": "https://job.byd.com/portal/pc/#/school/schoolPositionList",
+      "enabled": true,
+      "batch": "2027",
+      "campus_nature": "008501",
+      "page_size": 100,
+      "max_pages": 10,
+      "max_jobs": 1000,
+      "max_bytes": 5242880,
+      "headers": {
+        "Origin": "https://job.byd.com",
+        "Referer": "https://job.byd.com/portal/pc/"
+      }
+    },
+    {
+      "id": "geely-campus-official",
+      "name": "吉利汽车校园招聘官网",
+      "type": "moka-campus",
+      "company": "吉利汽车",
+      "url": "https://app.mokahr.com/campus-recruitment/geely/78436/",
+      "detail_base_url": "https://campus.geely.com/campus-recruitment/geely/78436",
+      "org_id": "geely",
+      "site_id": "78436",
+      "attribution": "https://campus.geely.com/campus-recruitment/geely/78436/#/jobs",
+      "enabled": true,
+      "page_size": 50,
+      "max_pages": 50,
+      "max_jobs": 3000,
+      "timeout_seconds": 300
+    },
+    {
       "id": "jobhunter1-public",
       "name": "秋招情报站公开岗位",
       "type": "jobhunter1-json",
