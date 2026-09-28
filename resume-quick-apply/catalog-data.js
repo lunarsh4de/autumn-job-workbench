@@ -94,6 +94,19 @@
     return `${parts.province} · ${parts.city}`;
   }
 
+  function companyTerms(value) {
+    return String(value || '').split('|').map(term => term.trim().toLowerCase()).filter(Boolean);
+  }
+
+  function matchesCompany(value, aliases) {
+    const company = text(value?.company, 160).toLowerCase();
+    return companyTerms(aliases).some(term => {
+      if (/[^a-z0-9]/.test(term)) return company.includes(term);
+      const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, 'i').test(company);
+    });
+  }
+
   function stableId(value) {
     let hash = 2166136261;
     for (const character of value) {
@@ -295,7 +308,7 @@
     };
   }
 
-  const api = { item, parseCsv, parseImport, merge, score, rescore, summary, classifyJobType, regionParts, formatRegion, deriveResumePreferences, mergePreferences, normalizeCompanyType };
+  const api = { item, parseCsv, parseImport, merge, score, rescore, summary, classifyJobType, regionParts, formatRegion, matchesCompany, deriveResumePreferences, mergePreferences, normalizeCompanyType };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else globalThis.CatalogData = api;
 })();

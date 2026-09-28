@@ -110,3 +110,10 @@ test('catalog classifies explicit and known state-owned employers', () => {
   assert.equal(C.item({ company: '国家电网有限公司', title: '技术研发', location: '北京' }).companyType, '国企/央企');
   assert.equal(C.item({ company: '某单位', title: '管培生', location: '上海', companyType: '央企' }).companyType, '国企/央企');
 });
+
+test('featured company aliases match acronyms without matching unrelated words', () => {
+  assert.equal(C.matchesCompany({ company: '上海蔚来汽车有限公司' }, '蔚来|NIO'), true);
+  assert.equal(C.matchesCompany({ company: 'NIO' }, '蔚来|NIO'), true);
+  assert.equal(C.matchesCompany({ company: '微软中国' }, '蔚来|NIO'), false);
+  assert.equal(C.matchesCompany({ company: 'Senior Research Lab' }, '蔚来|NIO'), false);
+});

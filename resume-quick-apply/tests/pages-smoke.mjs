@@ -71,10 +71,10 @@ try {
   await client.send('Runtime.enable');
   const deadline = Date.now() + 30000;
   let probe;
-  const numericTotal = value => Number(String(value || '').replace(/,/g, ''));
+  const numericTotal = value => Number((String(value || '').match(/[\d,]+/) || ['0'])[0].replace(/,/g, ''));
   while (Date.now() < deadline) {
     const result = await client.send('Runtime.evaluate', {
-      expression: `({total:document.querySelector('#catalog-total')?.textContent,status:document.querySelector('#public-sync-status')?.textContent,statusTitle:document.querySelector('#public-sync-status')?.title,rows:document.querySelectorAll('#catalog-table tr').length,platforms:[...document.querySelectorAll('#catalog-platform option')].map(option=>option.value),error:document.querySelector('#toast')?.textContent,githubSignInDisabled:document.querySelector('#github-sign-in')?.disabled,githubRestoreHidden:document.querySelector('#github-restore-backup')?.hidden,githubStatus:document.querySelector('#github-backup-status')?.textContent})`,
+      expression: `({total:document.querySelector('#catalog-total')?.textContent,status:document.querySelector('#public-sync-status')?.textContent,statusTitle:document.querySelector('#public-sync-status')?.title,rows:document.querySelectorAll('#catalog-table tr').length,platforms:[...document.querySelectorAll('#catalog-platform option')].map(option=>option.value),featured:[...document.querySelectorAll('[data-featured-company]')].map(card=>({company:card.dataset.featuredCompany,count:card.querySelector('[data-featured-count]')?.textContent})),error:document.querySelector('#toast')?.textContent,githubSignInDisabled:document.querySelector('#github-sign-in')?.disabled,githubRestoreHidden:document.querySelector('#github-restore-backup')?.hidden,githubStatus:document.querySelector('#github-backup-status')?.textContent})`,
       returnByValue: true
     });
     probe = result.result.value;
@@ -85,7 +85,26 @@ try {
   if (!/来源 \d+\/\d+ 正常/.test(probe.status || '')) throw new Error(`Pages source health status failed: ${JSON.stringify(probe)}`);
   const officialPlatforms = ['腾讯校园招聘官网', '美团校园招聘官网', '特斯拉校园招聘官网', '比亚迪校园招聘官网', '吉利汽车校园招聘官网'];
   if (!officialPlatforms.every(platform => probe?.platforms?.includes(platform))) throw new Error(`Official platforms missing: ${JSON.stringify(probe?.platforms)}`);
+  if (probe?.featured?.length !== 22 || !probe.featured.some(item => item.company.includes('特斯拉') && numericTotal(item.count) > 0) || !probe.featured.some(item => item.company.includes('比亚迪') && numericTotal(item.count) > 0) || !probe.featured.some(item => item.company.includes('吉利') && numericTotal(item.count) > 0)) throw new Error(`Featured employers failed: ${JSON.stringify(probe?.featured)}`);
   if (probe.githubSignInDisabled !== true || probe.githubRestoreHidden !== true || !/网页版仅保存在本机/.test(probe.githubStatus || '')) throw new Error(`Pages backup boundary failed: ${JSON.stringify(probe)}`);
+  await client.send('Runtime.evaluate', { expression: `const select=document.querySelector('#catalog-platform');select.value='腾讯校园招聘官网';select.dispatchEvent(new Event('change',{bubbles:true}))` });
+  await wait(100);
+  const officialFilter = await client.send('Runtime.evaluate', {
+    expression: `({count:document.querySelector('#catalog-result-count')?.textContent,platforms:[...document.querySelectorAll('#catalog-table .source-pill')].map(cell=>cell.textContent)})`,
+    returnByValue: true
+  });
+  const official = officialFilter.result.value;
+  if (numericTotal(official?.count) < 1 || official.platforms.some(platform => platform !== '腾讯校园招聘官网')) throw new Error(`Official platform filter failed: ${JSON.stringify(official)}`);
+  await client.send('Runtime.evaluate', { expression: `document.querySelector('#reset-catalog-filters')?.click()` });
+  await wait(100);
+  await client.send('Runtime.evaluate', { expression: `document.querySelector('[data-company-filter="特斯拉|Tesla"]')?.click()` });
+  await wait(100);
+  const featuredFilter = await client.send('Runtime.evaluate', {
+    expression: `({count:document.querySelector('#catalog-result-count')?.textContent,companies:[...document.querySelectorAll('#catalog-table .catalog-company-cell')].map(cell=>cell.firstChild?.textContent || cell.textContent)})`,
+    returnByValue: true
+  });
+  const filtered = featuredFilter.result.value;
+  if (numericTotal(filtered?.count) < 1 || filtered.companies.some(company => !company.includes('特斯拉') && company !== 'Tesla')) throw new Error(`Featured company filter failed: ${JSON.stringify(filtered)}`);
   console.log(JSON.stringify({ url: targetUrl, ...probe }, null, 2));
   await client.send('Browser.close');
 } finally {

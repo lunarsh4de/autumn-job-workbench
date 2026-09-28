@@ -9,6 +9,40 @@
     preferences: { roles: '', skills: '', cities: '' },
     query: '', companyQuery: '', province: 'all', city: 'all', jobType: 'all', companyType: 'all', platform: 'all', score: 'all', sort: 'match', visible: 200
   };
+  const employerGroups = [
+    {
+      label: '互联网 / 科技',
+      employers: [
+        ['华为', '华为|Huawei', 'https://career.huawei.com/reccampportal/portal5/index.html'],
+        ['字节跳动', '字节跳动|ByteDance', 'https://jobs.bytedance.com/campus'],
+        ['阿里巴巴', '阿里巴巴|Alibaba', 'https://talent.alibaba.com/campus/home'],
+        ['腾讯', '腾讯|Tencent', 'https://join.qq.com/'],
+        ['百度', '百度|Baidu', 'https://talent.baidu.com/jobs/list'],
+        ['小米', '小米|Xiaomi', 'https://hr.xiaomi.com/campus'],
+        ['美团', '美团|Meituan', 'https://zhaopin.meituan.com/web/position?hiringType=1_1'],
+        ['京东', '京东|JD.com|JD.COM', 'https://campus.jd.com/'],
+        ['网易', '网易|NetEase', 'https://campus.163.com/']
+      ]
+    },
+    {
+      label: '汽车 / 新能源',
+      employers: [
+        ['特斯拉', '特斯拉|Tesla', 'https://app.mokahr.com/campus-recruitment/tesla/41460?locale=zh-CN#/jobs'],
+        ['蔚来', '蔚来|NIO', 'https://www.nio.com/careers'],
+        ['比亚迪', '比亚迪|BYD', 'https://job.byd.com/portal/pc/#/school/schoolPositionList'],
+        ['理想汽车', '理想汽车|Li Auto', 'https://www.lixiang.com/employ.html'],
+        ['小鹏汽车', '小鹏|XPENG', 'https://www.xiaopeng.com/'],
+        ['吉利汽车', '吉利|Geely', 'https://campus.geely.com/campus-recruitment/geely/78436/#/jobs'],
+        ['极氪', '极氪|ZEEKR', 'https://app.mokahr.com/campus-recruitment/geely/98147#/jobs'],
+        ['长城汽车', '长城汽车|GWM', 'https://zhaopin.gwm.cn/'],
+        ['上汽集团', '上汽|SAIC', 'https://www.saicmotor.com/chinese/rlzy/rcxq/xyzp/index_xz2.shtml'],
+        ['长安汽车', '长安汽车|Changan', 'https://changan.zhiye.com/'],
+        ['中国一汽', '中国一汽|一汽|FAW', 'https://www.faw.com.cn/fawcn/373692/rlzy17/rczl/index.html'],
+        ['东风汽车', '东风汽车|Dongfeng', 'https://www.dfmc.com.cn/zhaopin/xiaoyuanzhaopin.html'],
+        ['宁德时代', '宁德时代|CATL', 'https://talent.catl.com/']
+      ]
+    }
+  ];
   let resumeCandidate = null;
   let publicSyncing = false;
   let importing = false;
@@ -47,11 +81,63 @@
     return dashboard.getItems().some(entry => (job.url && entry.url === job.url) || (entry.company === job.company && entry.title === job.title));
   }
 
+  function renderEmployerDirectories() {
+    const featuredRoot = document.querySelector('#featured-employer-groups');
+    const sourceRoot = document.querySelector('#employer-source-groups');
+    if (!featuredRoot || !sourceRoot) return;
+    featuredRoot.replaceChildren();
+    sourceRoot.replaceChildren();
+    for (const group of employerGroups) {
+      const featuredGroup = element('section', 'featured-employer-group');
+      featuredGroup.append(element('h4', '', group.label));
+      const featuredList = element('div', 'featured-employer-list');
+      const sourceGroup = element('section', 'employer-source-group');
+      sourceGroup.append(element('h4', '', group.label));
+      const sourceList = element('div', 'employer-source-list');
+      for (const [name, aliases, url] of group.employers) {
+        const card = element('article', 'featured-employer');
+        card.dataset.featuredCompany = aliases;
+        const copy = document.createElement('div');
+        const count = element('span', '', '本地岗位 0');
+        count.dataset.featuredCount = '';
+        copy.append(element('strong', '', name), count);
+        const actions = element('div', 'featured-employer-actions');
+        const filter = element('button', 'button compact secondary', '筛选');
+        filter.type = 'button';
+        filter.dataset.companyFilter = aliases;
+        filter.setAttribute('aria-label', `筛选${name}岗位`);
+        const link = document.createElement('a');
+        link.className = 'icon-button';
+        link.href = url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.title = `打开${name}官方招聘`;
+        link.setAttribute('aria-label', `打开${name}官方招聘`);
+        link.append(icon('external-link'));
+        actions.append(filter, link);
+        card.append(copy, actions);
+        featuredList.append(card);
+
+        const sourceLink = document.createElement('a');
+        sourceLink.className = 'employer-source-link';
+        sourceLink.href = url;
+        sourceLink.target = '_blank';
+        sourceLink.rel = 'noopener noreferrer';
+        sourceLink.append(element('span', '', name), icon('external-link'));
+        sourceList.append(sourceLink);
+      }
+      featuredGroup.append(featuredList);
+      sourceGroup.append(sourceList);
+      featuredRoot.append(featuredGroup);
+      sourceRoot.append(sourceGroup);
+    }
+  }
+
   function filteredItems() {
     const query = state.query.toLowerCase();
     const list = state.items.filter(job => {
       if (query && !`${job.company} ${job.title} ${job.location} ${job.province} ${job.city} ${job.platform} ${job.companyType} ${job.jobType} ${job.tags.join(' ')}`.toLowerCase().includes(query)) return false;
-      if (state.companyQuery && !job.company.toLowerCase().includes(state.companyQuery.toLowerCase())) return false;
+      if (state.companyQuery && !CD.matchesCompany(job, state.companyQuery)) return false;
       if (state.province !== 'all' && job.province !== state.province) return false;
       if (state.city !== 'all' && job.city !== state.city) return false;
       if (state.jobType !== 'all' && job.jobType !== state.jobType) return false;
@@ -102,8 +188,29 @@
     if (regionSummary) regionSummary.textContent = state.province === 'all' ? '不限' : `${state.province}${state.city === 'all' ? '' : ` · ${state.city}`}`;
     const jobSummary = document.querySelector('#catalog-job-summary');
     if (jobSummary) jobSummary.textContent = state.jobType === 'all' ? '不限' : state.jobType;
+    renderFeaturedEmployers();
     renderMatchStrip();
     renderTable();
+  }
+
+  function renderFeaturedEmployers() {
+    document.querySelectorAll('[data-featured-company]').forEach(card => {
+      const count = state.items.filter(job => CD.matchesCompany(job, card.dataset.featuredCompany)).length;
+      const label = card.querySelector('[data-featured-count]');
+      if (label) label.textContent = `本地岗位 ${formatNumber(count)}`;
+      card.dataset.available = String(count > 0);
+    });
+  }
+
+  function filterCompany(value) {
+    state.companyQuery = value;
+    state.visible = 200;
+    document.querySelector('#catalog-company').value = value.split('|')[0];
+    document.querySelector('#catalog-search').value = '';
+    document.querySelector('#global-search').value = '';
+    state.query = '';
+    renderTable();
+    document.querySelector('.catalog-browser').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function renderMatchStrip() {
@@ -503,6 +610,11 @@
         resetFilters();
         return;
       }
+      const companyFilter = event.target.closest('[data-company-filter]');
+      if (companyFilter) {
+        filterCompany(companyFilter.dataset.companyFilter);
+        return;
+      }
       const details = event.target.closest('[data-catalog-details]');
       if (details) {
         const job = state.items.find(item => item.id === details.dataset.catalogDetails);
@@ -647,6 +759,7 @@
     apply.addEventListener('click', () => applyDashboardResume().catch(error => dashboard.flash(`简历应用失败：${error.message}`, true)));
   }
 
+  renderEmployerDirectories();
   installEvents();
   installResumeUpload();
   load().then(async () => {
