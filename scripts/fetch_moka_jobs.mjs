@@ -16,7 +16,10 @@ for (const key of ['url', 'org_id', 'site_id']) {
 const pageSize = Math.min(Math.max(Number(source.page_size || 50), 1), 50);
 const maxPages = Math.min(Math.max(Number(source.max_pages || 30), 1), 100);
 const maxJobs = Math.min(Math.max(Number(source.max_jobs || 3000), 1), 10000);
+const landingUrl = source.fetch_url || source.url;
 const apiUrl = source.api_url || 'https://app.mokahr.com/api/outer/ats-apply/website/jobs/v2';
+const retryAttempts = Math.min(Math.max(Number(source.retry_attempts || 6), 1), 10);
+const requestTimeoutMs = Math.min(Math.max(Number(source.request_timeout_seconds || 60), 10), 120) * 1000;
 const headers = {
   accept: 'application/json',
   'content-type': 'application/json',
@@ -25,20 +28,22 @@ const headers = {
 
 async function fetchWithTimeout(url, options = {}) {
   let lastError;
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
+  for (let attempt = 1; attempt <= retryAttempts; attempt += 1) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 45000);
+    const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
     try {
       const response = await fetch(url, { ...options, signal: controller.signal });
-      if (response.status < 500 || attempt === 3) return response;
+      const retryable = response.status === 408 || response.status === 425 || response.status === 429 || response.status >= 500;
+      if (!retryable || attempt === retryAttempts) return response;
       lastError = new Error(`HTTP ${response.status}`);
     } catch (error) {
       lastError = error;
-      if (attempt === 3) throw error;
+      if (attempt === retryAttempts) throw error;
     } finally {
       clearTimeout(timeout);
     }
-    await new Promise(resolve => setTimeout(resolve, attempt * 750));
+    const delayMs = Math.min(1000 * (2 ** (attempt - 1)), 10000);
+    await new Promise(resolve => setTimeout(resolve, delayMs));
   }
   throw lastError;
 }
@@ -50,14 +55,14 @@ function cookieHeader(response) {
   return values.map(value => value.split(';', 1)[0]).join('; ');
 }
 
-const initialResponse = await fetchWithTimeout(source.url, {
+const initialResponse = await fetchWithTimeout(landingUrl, {
   redirect: 'manual',
   headers: { 'user-agent': headers['user-agent'] },
 });
 const cookie = cookieHeader(initialResponse);
 let landingResponse = initialResponse;
 if (initialResponse.status >= 300 && initialResponse.status < 400) {
-  const target = new URL(initialResponse.headers.get('location') || source.url, source.url);
+  const target = new URL(initialResponse.headers.get('location') || landingUrl, landingUrl);
   landingResponse = await fetchWithTimeout(target, {
     headers: { 'user-agent': headers['user-agent'], cookie },
   });
@@ -80,6 +85,7 @@ function decryptResponse(payload) {
 }
 
 const jobs = [];
+const warnings = [];
 let totalAvailable = 0;
 let offset = 0;
 for (let page = 0; page < maxPages && jobs.length < maxJobs; page += 1) {
@@ -94,15 +100,22 @@ for (let page = 0; page < maxPages && jobs.length < maxJobs; page += 1) {
     site: 'campus',
     locale: source.locale || 'zh-CN',
   };
-  const response = await fetchWithTimeout(apiUrl, {
-    method: 'POST',
-    headers: { ...headers, ...(cookie ? { cookie } : {}) },
-    body: JSON.stringify(requestBody),
-  });
-  if (!response.ok) throw new Error(`Moka jobs API returned HTTP ${response.status}`);
-  const decrypted = decryptResponse(await response.json());
-  if (!decrypted?.success || !Array.isArray(decrypted?.data?.jobs)) {
-    throw new Error(decrypted?.msg || 'Moka jobs API returned an unexpected response');
+  let decrypted;
+  try {
+    const response = await fetchWithTimeout(apiUrl, {
+      method: 'POST',
+      headers: { ...headers, ...(cookie ? { cookie } : {}) },
+      body: JSON.stringify(requestBody),
+    });
+    if (!response.ok) throw new Error(`Moka jobs API returned HTTP ${response.status}`);
+    decrypted = decryptResponse(await response.json());
+    if (!decrypted?.success || !Array.isArray(decrypted?.data?.jobs)) {
+      throw new Error(decrypted?.msg || 'Moka jobs API returned an unexpected response');
+    }
+  } catch (error) {
+    if (!jobs.length) throw error;
+    warnings.push(`Stopped after ${jobs.length} jobs at offset ${offset}: ${error?.message || error}`);
+    break;
   }
   const batch = decrypted.data.jobs;
   if (page === 0) totalAvailable = Number(decrypted.data.jobStats?.total || batch.length);
@@ -112,4 +125,4 @@ for (let page = 0; page < maxPages && jobs.length < maxJobs; page += 1) {
   if (totalAvailable && offset >= totalAvailable) break;
 }
 
-process.stdout.write(JSON.stringify({ totalAvailable, fetched: jobs.length, jobs }));
+process.stdout.write(JSON.stringify({ totalAvailable, fetched: jobs.length, warnings, jobs }));

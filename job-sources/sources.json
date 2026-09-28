@@ -77,8 +77,10 @@
       "name": "吉利汽车校园招聘官网",
       "type": "moka-campus",
       "company": "吉利汽车",
-      "url": "https://app.mokahr.com/campus-recruitment/geely/78436/",
+      "url": "https://campus.geely.com/campus-recruitment/geely/78436/",
+      "fetch_url": "https://app.mokahr.com/campus-recruitment/geely/78436/",
       "detail_base_url": "https://campus.geely.com/campus-recruitment/geely/78436",
+      "api_url": "https://app.mokahr.com/api/outer/ats-apply/website/jobs/v2",
       "org_id": "geely",
       "site_id": "78436",
       "attribution": "https://campus.geely.com/campus-recruitment/geely/78436/#/jobs",
@@ -86,7 +88,9 @@
       "page_size": 50,
       "max_pages": 50,
       "max_jobs": 3000,
-      "timeout_seconds": 300
+      "retry_attempts": 6,
+      "request_timeout_seconds": 45,
+      "timeout_seconds": 360
     },
     {
       "id": "jobhunter1-public",
