@@ -44,7 +44,7 @@
 - 其他公司继续使用官网或公开源数据；只有已验证可稳定公开读取岗位明细的官网才进入自动 feed，不会把“校园招聘 / 实习岗位（官方入口）”当成真实岗位。
 - [pages.yml](../.github/workflows/pages.yml) 在北京时间每天 08:00、14:00 自动运行，也支持在 Actions 页面点击 `Run workflow` 一键刷新。
 - 公开来源不需要个人 Token。Actions 自带的 `GITHUB_TOKEN` 只用于工作流权限；当前构建甚至不需要把 Token 交给脚本。
-- Pages 打开后会读取同源 `jobs.json` 并写入访问者自己的 IndexedDB，六小时内不重复下载；“立即同步”可忽略缓存强制刷新。
+- Pages 打开后会读取同源 `jobs.json` 并用当前公共源结果替换旧公共岗位，过期岗位会从浏览器自己的 IndexedDB 移除；“立即同步”可手动再次刷新。
 
 发布前需要把仓库推送到 GitHub，并在仓库 `Settings → Pages → Build and deployment` 中将 Source 设为 `GitHub Actions`。数据源的转载和自动采集权限应由仓库维护者确认；登录态、Cookie、验证码和私人 Token 不应放入前端或公开仓库。
 

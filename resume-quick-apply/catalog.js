@@ -473,11 +473,6 @@
     try {
       const saved = await dashboard.storage.get(['publicCatalogSync']);
       const previous = saved.publicCatalogSync;
-      if (!force && previous?.at && Date.now() - previous.at < 6 * 60 * 60 * 1000) {
-        const healthLabel = sourceHealthLabel(previous.sources);
-        setPublicStatus(`公共源已同步 ${previous.total || 0} 条${healthLabel ? ` · ${healthLabel}` : ''}（${new Date(previous.at).toLocaleString('zh-CN')}）`, 'ready', sourceHealthDetail(previous.sources));
-        return false;
-      }
       setPublicStatus('正在同步 GitHub Actions 公共岗位源...', 'loading');
       const response = await fetch(`jobs.json?refresh=${Date.now()}`, { cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer' });
       if (response.status === 404) {
@@ -490,7 +485,7 @@
       const content = await response.text();
       if (content.length > 25 * 1024 * 1024) throw new Error('公共岗位源超过 25 MB');
       const parsed = CD.rescore(CD.parseImport(content), state.preferences);
-      const merged = CD.merge(state.items, parsed);
+      const merged = CD.replacePublic(state.items, parsed);
       if (merged.items.length > 50000) throw new Error('合并后岗位超过 50,000 条');
       await DB.replaceAll(merged.items);
       state.items = merged.items;

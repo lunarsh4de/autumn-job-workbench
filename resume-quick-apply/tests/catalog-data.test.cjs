@@ -117,3 +117,13 @@ test('featured company aliases match acronyms without matching unrelated words',
   assert.equal(C.matchesCompany({ company: '微软中国' }, '蔚来|NIO'), false);
   assert.equal(C.matchesCompany({ company: 'Senior Research Lab' }, '蔚来|NIO'), false);
 });
+
+test('public catalog replacement removes stale public jobs but preserves local records', () => {
+  const existing = [
+    { id: 'old-official', company: '腾讯', title: '已下架岗位', platform: '腾讯校园招聘官网', sourceId: 'tencent-campus-official' },
+    { id: 'old-local', company: '自定义公司', title: '本地记录', platform: '本地导入' }
+  ];
+  const incoming = [{ id: 'new-official', company: '腾讯', title: '新岗位', platform: '腾讯校园招聘官网', sourceId: 'tencent-campus-official' }];
+  const result = C.replacePublic(existing, incoming);
+  assert.deepEqual(new Set(result.items.map(job => job.title)), new Set(['本地记录', '新岗位']));
+});

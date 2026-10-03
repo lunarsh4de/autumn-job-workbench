@@ -167,6 +167,8 @@
       description: text(row.description || value.description, 12000),
       publishedAt: text(row.publishedAt || value.publishedAt, 30),
       deadline: text(row.deadline || value.deadline, 30),
+      sourceId: text(value.sourceId, 120),
+      sourceAttribution: webUrl(value.sourceAttribution),
       matchScore,
       importedAt: Number.isFinite(value.importedAt) ? value.importedAt : now,
       updatedAt: Number.isFinite(value.updatedAt) ? value.updatedAt : now
@@ -239,6 +241,17 @@
     return { items: [...map.values()], added, updated };
   }
 
+  function replacePublic(existing, incoming) {
+    const publicPlatforms = new Set((incoming || []).map(value => text(value?.platform, 100)).filter(Boolean));
+    const publicSourceIds = new Set((incoming || []).map(value => text(value?.sourceId, 120)).filter(Boolean));
+    const retained = (existing || []).filter(value => {
+      const normalized = item(value);
+      if (!normalized) return false;
+      return !publicPlatforms.has(normalized.platform) && !publicSourceIds.has(normalized.sourceId);
+    });
+    return merge(retained, incoming);
+  }
+
   function preferenceTokens(preferences) {
     const split = value => text(value, 3000).toLowerCase().split(/[,，;；|/\n\s]+/).map(token => token.trim()).filter(token => token.length >= 2);
     return {
@@ -308,7 +321,7 @@
     };
   }
 
-  const api = { item, parseCsv, parseImport, merge, score, rescore, summary, classifyJobType, regionParts, formatRegion, matchesCompany, deriveResumePreferences, mergePreferences, normalizeCompanyType };
+  const api = { item, parseCsv, parseImport, merge, replacePublic, score, rescore, summary, classifyJobType, regionParts, formatRegion, matchesCompany, deriveResumePreferences, mergePreferences, normalizeCompanyType };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else globalThis.CatalogData = api;
 })();
