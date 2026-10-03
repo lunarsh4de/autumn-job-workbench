@@ -27,7 +27,38 @@ jobs:
       - name: Prepare static site
         run: |
           mkdir -p _site/icons
-          python scripts/refresh_jobs.py --sources job-sources/sources.json --output _site/jobs.json --allow-partial
+          for attempt in 1 2 3; do
+            python scripts/refresh_jobs.py --sources job-sources/sources.json --output _site/jobs.json --allow-partial
+            if python - <<'PY'
+          import json
+          import sys
+
+          required = {
+              "tencent-campus-official",
+              "meituan-campus-official",
+              "tesla-campus-official",
+              "byd-campus-official",
+              "geely-campus-official",
+          }
+          document = json.load(open("_site/jobs.json", encoding="utf-8"))
+          bad = [
+              source for source in document["meta"]["sources"]
+              if source.get("id") in required and (source.get("status") != "ok" or not source.get("count"))
+          ]
+          if bad:
+              print("Official source retry required:", json.dumps(bad, ensure_ascii=False))
+              sys.exit(1)
+          print("Official sources healthy:", len(required))
+          PY
+            then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Official job sources did not recover after 3 attempts."
+              exit 1
+            fi
+            sleep 15
+          done
           cp resume-quick-apply/dashboard.html _site/index.html
           cp resume-quick-apply/dashboard.css resume-quick-apply/dashboard.js resume-quick-apply/dashboard-data.js resume-quick-apply/github-sync.js resume-quick-apply/catalog.js resume-quick-apply/catalog-data.js resume-quick-apply/catalog-db.js _site/
           cp resume-quick-apply/data.js resume-quick-apply/backup-sync-data.js resume-quick-apply/resume-parser.js _site/
