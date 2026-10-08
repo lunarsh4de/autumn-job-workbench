@@ -27,9 +27,9 @@ jobs:
       - name: Prepare static site
         run: |
           mkdir -p _site/icons
+          official_sources_healthy=false
           for attempt in 1 2 3; do
-            python scripts/refresh_jobs.py --sources job-sources/sources.json --output _site/jobs.json --allow-partial
-            if python - <<'PY'
+            if python scripts/refresh_jobs.py --sources job-sources/sources.json --output _site/jobs.json --allow-partial && python - <<'PY'
           import json
           import sys
 
@@ -41,6 +41,9 @@ jobs:
               "geely-campus-official",
           }
           document = json.load(open("_site/jobs.json", encoding="utf-8"))
+          if not isinstance(document.get("jobs"), list) or not document["jobs"]:
+              print("Generated job feed is empty.")
+              sys.exit(1)
           bad = [
               source for source in document["meta"]["sources"]
               if source.get("id") in required and (source.get("status") != "ok" or not source.get("count"))
@@ -51,14 +54,33 @@ jobs:
           print("Official sources healthy:", len(required))
           PY
             then
+              official_sources_healthy=true
               break
             fi
-            if [ "$attempt" -eq 3 ]; then
-              echo "Official job sources did not recover after 3 attempts."
-              exit 1
+            if [ "$attempt" -lt 3 ]; then
+              echo "Official job sources are temporarily unavailable; retrying (attempt $((attempt + 1))/3)."
+              sleep 15
             fi
-            sleep 15
           done
+          if [ "$official_sources_healthy" != true ]; then
+            echo "::warning::One or more official job sources remain unavailable; publishing the validated partial feed."
+            python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("_site/jobs.json")
+          document = json.loads(path.read_text(encoding="utf-8"))
+          jobs = document.get("jobs")
+          sources = document.get("meta", {}).get("sources", [])
+          successful = [source for source in sources if source.get("status") == "ok" and source.get("count", 0)]
+          if not isinstance(jobs, list) or not jobs:
+              raise SystemExit("Cannot publish: the generated job feed is empty.")
+          if not successful:
+              raise SystemExit("Cannot publish: no job source completed successfully.")
+          failed = [source.get("name") or source.get("id") for source in sources if source.get("status") == "error"]
+          print(f"Publishing {len(jobs)} jobs from {len(successful)} successful source(s); unavailable sources: {failed or 'none'}")
+          PY
+          fi
           cp resume-quick-apply/dashboard.html _site/index.html
           cp resume-quick-apply/dashboard.css resume-quick-apply/dashboard.js resume-quick-apply/dashboard-data.js resume-quick-apply/github-sync.js resume-quick-apply/catalog.js resume-quick-apply/catalog-data.js resume-quick-apply/catalog-db.js _site/
           cp resume-quick-apply/data.js resume-quick-apply/backup-sync-data.js resume-quick-apply/resume-parser.js _site/
