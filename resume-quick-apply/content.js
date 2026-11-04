@@ -471,46 +471,73 @@
     } finally { filling = false; }
   }
 
+  const isBoss = () => /(^|\.)zhipin\.com$/i.test(location.hostname);
+  function visibleForRead(element) {
+    if (!element?.isConnected || element.closest(`#${ROOT_ID}`)) return false;
+    for (let node = element; node; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      if (node.hidden || node.getAttribute('aria-hidden') === 'true' || style.display === 'none' || ['hidden', 'collapse'].includes(style.visibility)) return false;
+    }
+    return true;
+  }
+  function visibleText(root, selectors, max = 1000) {
+    for (const selector of selectors.split(',')) {
+      const element = [...root.querySelectorAll(selector)].find(visibleForRead);
+      const text = (element?.innerText || element?.textContent || '').trim();
+      if (text) return text.slice(0, max);
+    }
+    return '';
+  }
   function pageIdentity() {
+    if (isBoss()) {
+      // Only use the active detail pane, never an arbitrary recommendation or chat-list row.
+      const root = [...document.querySelectorAll('.job-banner, .job-detail-box, .job-detail, .chat-job-info')].find(visibleForRead);
+      const title = root ? visibleText(root, '.job-name, .name h1, h1, .job-title', 240) : '';
+      const company = (root && visibleText(root, '.company-name, .company-info a, .company-info', 160)) ||
+        visibleText(document, '.sider-company .company-info a, .sider-company .company-name', 160);
+      const link = root?.querySelector('a[href*="/job_detail/"]');
+      return { title, company, url: ResumeData.applicationUrl(link?.href || location.href),
+        location: root ? visibleText(root, '.job-area, .job-location, .text-city', 120) : '',
+        salary: root ? visibleText(root, '.salary, .job-salary', 120) : '' };
+    }
     const candidates = [...document.querySelectorAll('h1, h2, [class*="job-title"], [class*="position-title"]')]
       .map(element => element.textContent?.trim()).filter(text => text && text.length <= 120);
     const title = candidates[0] || document.title || location.href;
     const hostname = location.hostname;
     const careerHost = /^(?:apply\.)?careers\.([^.]+)\./i.exec(hostname)?.[1];
-    const genericLabels = /^(?:moka|mokahr|招聘|招聘平台|career(?:s)?|career portal|job portal)$/i;
+    const genericLabels = /^(?:moka|mokahr|BOSS直聘|智联招聘|前程无忧|猎聘|招聘|招聘平台|career(?:s)?|career portal|job portal)$/i;
     const metadataCompany = ['meta[property="og:site_name"]', 'meta[name="application-name"]']
       .map(selector => document.querySelector(selector)?.content?.trim() || '')
       .find(value => value && value.length <= 120 && !genericLabels.test(value));
-    const company = metadataCompany || (careerHost ? (careerHost.length <= 6 ? careerHost.toUpperCase() : careerHost) : hostname);
-    return { title, company };
+    const company = visibleText(document, '[itemprop="hiringOrganization"] [itemprop="name"], .company-name, .companyName', 160) || metadataCompany || (careerHost ? (careerHost.length <= 6 ? careerHost.toUpperCase() : careerHost) : hostname);
+    return { title, company, url: ResumeData.applicationUrl(location.href),
+      location: visibleText(document, '[itemprop="jobLocation"], .job-location', 120), salary: visibleText(document, '[itemprop="baseSalary"], .job-salary', 120) };
   }
 
   async function markApplied(source = 'manual') {
-    const data = await chrome.storage.local.get(['applications', 'activeProfileId', 'activeProfileLabel', 'resumeProfiles']);
-    const applications = Array.isArray(data.applications) ? data.applications.filter(item => item && typeof item.url === 'string' && Number.isFinite(item.createdAt)) : [];
-    const alreadyRecorded = applications.some((item) => item.url === location.href && Date.now() - item.createdAt < 24 * 60 * 60 * 1000);
-    if (alreadyRecorded) {
-      if (source === 'manual') showStatus('今天已经记录过这个页面。', 'normal');
-      return false;
-    }
-    const identity = pageIdentity();
+    const identity = submissionIdentity && source === 'auto' ? submissionIdentity : pageIdentity();
+    const data = await chrome.storage.local.get(['activeProfileId', 'activeProfileLabel', 'resumeProfiles']);
+    if (source === 'auto' && isBoss() && !/\/job_detail\//.test(new URL(identity.url).pathname)) throw new Error('未识别到独立岗位链接，请在插件中手动保存当前岗位');
     const activeProfile = Array.isArray(data.resumeProfiles)
       ? data.resumeProfiles.find(item => item && item.id === data.activeProfileId)
       : null;
     const resumeProfileId = lastResumeProfile?.id || activeProfile?.id || (typeof data.activeProfileId === 'string' ? data.activeProfileId : '');
     const resumeProfileLabel = lastResumeProfile?.label || activeProfile?.label || (typeof data.activeProfileLabel === 'string' ? data.activeProfileLabel : '') || '默认简历';
-    applications.unshift({ ...identity, url: location.href, createdAt: Date.now(), status: source === 'auto' ? 'submitted' : 'recorded', source, resumeProfileId, resumeProfileLabel });
-    await chrome.storage.local.set({ applications: applications.slice(0, 500) });
-    showStatus(source === 'auto' ? '检测到投递成功，已自动记录。' : '已记录本次投递。', 'success');
-    return true;
+    const result = await chrome.runtime.sendMessage({ type: 'saveApplication', application: {
+      ...identity, status: source === 'auto' ? 'submitted' : 'recorded', source, resumeProfileId, resumeProfileLabel
+    } });
+    if (!result || result.error) throw new Error(result?.error || '本地记录保存失败');
+    showStatus(source === 'auto' ? '检测到投递成功，已自动记录。' : '已保存岗位记录，可在插件中确认投递状态。', 'success');
+    return result.added;
   }
 
   let submissionObserver = null;
   let submissionTimer = null;
   let submissionBaseline = new Map();
+  let submissionIdentity = null;
   const submissionMarkerKey = 'rqa-pending-submission';
   const submissionMarkerTtl = 2 * 60 * 1000;
-  const successPattern = /投递成功|申请成功|提交成功|成功提交|已成功投递|投递完成|申请已提交|已完成申请|感谢(?:您|你的)?(?:申请|投递)|thank you for (?:applying|your application)|application (?:has been )?(?:submitted|received)|(?:submission|application) successful|successfully applied/i;
+  const successPattern = /投递成功|申请成功|提交成功|成功提交|已成功投递|投递完成|简历发送成功|成功发送简历|申请已提交|已完成申请|感谢(?:您|你的)?(?:申请|投递)|thank you for (?:applying|your application)|application (?:has been )?(?:submitted|received)|(?:submission|application) successful|successfully applied/i;
   function clearSubmissionMarker() {
     try { window.sessionStorage.removeItem(submissionMarkerKey); } catch {}
   }
@@ -553,10 +580,11 @@
   function checkSubmissionSuccess() {
     if (!visibleSuccessMessage()) return;
     stopSubmissionWatch();
-    markApplied('auto').catch(error => showStatus(`自动记录失败：${error.message}。请点击“标记已投递”重试。`, 'warning'));
+    markApplied('auto').catch(error => showStatus(`自动记录失败：${error.message}。请点击“记录当前岗位”重试。`, 'warning'));
   }
   function watchSubmissionResult() {
     stopSubmissionWatch();
+    submissionIdentity = pageIdentity();
     submissionBaseline = new Map(successCandidates().map(element => [element, (element.innerText || element.textContent || '').trim()]));
     markSubmissionPending();
     submissionObserver = new MutationObserver(checkSubmissionSuccess);
@@ -567,9 +595,9 @@
   document.addEventListener('submit', () => watchSubmissionResult(), true);
   document.addEventListener('click', event => {
     if (!event.isTrusted) return;
-    const control = event.target.closest('button, input[type="submit"], [role="button"]');
+    const control = event.target.closest('button, a, input[type="submit"], [role="button"]');
     const text = control?.textContent?.trim() || control?.value?.trim() || '';
-    if (/提交申请|确认提交|立即申请|投递简历|预览并提交|submit application|apply now/i.test(text)) watchSubmissionResult();
+    if (/提交申请|确认提交|立即申请|投递简历|发送简历|预览并提交|submit application|apply now/i.test(text)) watchSubmissionResult();
   }, true);
   function resumeRedirectedSubmission(marker) {
     if (!marker) return;
@@ -587,6 +615,8 @@
     if (!uiRoot) mount();
     const status = uiRoot?.querySelector('.rqa-status');
     if (!status) return;
+    uiRoot.querySelector('.rqa-panel').hidden = false;
+    uiRoot.querySelector('.rqa-toggle').setAttribute('aria-expanded', 'true');
     status.textContent = text;
     status.dataset.type = type;
     status.hidden = false;
@@ -609,39 +639,39 @@
           <button class="rqa-preview" type="button"><img src="${icon('scan-search')}" alt="">检查字段</button>
           <button class="rqa-undo" type="button"><img src="${icon('undo-2')}" alt="">撤销填写</button>
         </div>
-        <button class="rqa-mark" type="button"><img src="${icon('circle-check')}" alt="">标记已投递</button>
-        <div class="rqa-hint">成功状态会自动记录；失败时可点击“标记已投递”重试。附件选择可能触发网站立即上传</div>
+        <button class="rqa-mark" type="button"><img src="${icon('circle-check')}" alt="">记录当前岗位</button>
+        <div class="rqa-hint">明确投递成功才自动记录。手动记录后，可在插件中更新状态。附件选择可能触发网站上传。</div>
         <div class="rqa-status" role="status" hidden></div>
       </div>
       <button class="rqa-toggle" type="button" aria-label="打开投简历助手" aria-expanded="false"><img src="${icon('briefcase-business')}" alt=""></button>`;
     const style = document.createElement('style');
     style.textContent = `
-      :host{position:fixed;z-index:2147483647;right:18px;bottom:18px;font:13px/1.4 Arial,"Microsoft YaHei",sans-serif;color:#16202a;letter-spacing:0}
+      :host{position:fixed;z-index:2147483647;right:16px;bottom:16px;font:14px/1.55 "Segoe UI","Microsoft YaHei",sans-serif;color:#182b34;letter-spacing:0}
       :host *{box-sizing:border-box}
       :host button{font:inherit;letter-spacing:0;cursor:pointer}
       :host img{display:block;width:17px;height:17px}
       :host [hidden]{display:none!important}
-      :host .rqa-toggle{display:grid;place-items:center;width:46px;height:46px;margin-left:auto;border:0;border-radius:50%;background:#087f73;box-shadow:0 4px 16px #17202a3d}
+      :host .rqa-toggle{display:grid;place-items:center;width:46px;height:46px;margin-left:auto;border:0;border-radius:14px;background:#116b61;box-shadow:0 4px 16px #17202a3d}
       :host .rqa-toggle img{filter:brightness(0) invert(1)}
-      :host .rqa-panel{width:224px;margin-bottom:9px;padding:12px;border:1px solid #dce3e8;border-radius:7px;background:#fff;box-shadow:0 8px 28px #17202a2e}
+      :host .rqa-panel{width:min(280px,calc(100vw - 32px));max-height:calc(100vh - 100px);overflow-y:auto;margin-bottom:12px;padding:16px;border:1px solid #d7e1e6;border-radius:10px;background:#fff;box-shadow:0 8px 28px #17202a2e}
       :host .rqa-head{display:flex;align-items:center;gap:9px;padding-bottom:10px;border-bottom:1px solid #e7ecef}
       :host .rqa-head>span{display:grid;place-items:center;width:32px;height:32px;border-radius:6px;background:#e4f2ef}
       :host .rqa-head>span img{filter:invert(38%) sepia(52%) saturate(957%) hue-rotate(128deg)}
       :host .rqa-title{font-weight:700}
-      :host .rqa-head small{color:#66727f;font-size:10px}
-      :host .rqa-fill{display:flex;align-items:center;gap:9px;width:100%;min-height:48px;margin-top:10px;border:0;border-radius:5px;padding:8px 10px;background:#087f73;color:#fff;text-align:left}
+      :host .rqa-head small{color:#526873;font-size:12px}
+      :host .rqa-fill{display:flex;align-items:center;gap:9px;width:100%;min-height:56px;margin-top:12px;border:0;border-radius:8px;padding:10px 12px;background:#116b61;color:#fff;text-align:left}
       :host .rqa-fill>img{filter:brightness(0) invert(1)}
       :host .rqa-fill span{display:grid}
-      :host .rqa-fill strong{font-size:12px}
-      :host .rqa-fill small{color:#d4eeea;font-size:10px}
+      :host .rqa-fill strong{font-size:14px}
+      :host .rqa-fill small{color:#fff;font-size:12px}
       :host .rqa-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
-      :host .rqa-preview,:host .rqa-undo,:host .rqa-mark{display:flex;align-items:center;justify-content:center;gap:5px;min-height:34px;border:1px solid #dce3e8;border-radius:4px;padding:6px;background:#fff;color:#35424e;font-size:11px}
+      :host .rqa-preview,:host .rqa-undo,:host .rqa-mark{display:flex;align-items:center;justify-content:center;gap:5px;min-height:40px;border:1px solid #d7e1e6;border-radius:8px;padding:8px;background:#fff;color:#182b34;font-size:13px}
       :host .rqa-preview img,:host .rqa-undo img,:host .rqa-mark img{width:14px;height:14px}
       :host .rqa-mark{width:100%;margin-top:6px;background:#edf3f4;color:#075f58}
-      :host .rqa-status{margin-top:9px;padding:7px;border-radius:4px;background:#eef3f6;color:#44515c;font-size:10px}
-      :host .rqa-hint{margin-top:8px;color:#66727f;font-size:9px;text-align:center}
+      :host .rqa-status{margin-top:12px;padding:10px;border-radius:8px;background:#edf3f5;color:#182b34;font-size:13px;overflow-wrap:anywhere}
+      :host .rqa-hint{margin-top:12px;color:#526873;font-size:12px;text-align:left}
       :host .rqa-status[data-type="success"]{background:#e5f4f0;color:#185f54}
-      :host button:focus-visible{outline:2px solid #4b8ee8;outline-offset:2px}
+      :host button:focus-visible{outline:3px solid #245bb6;outline-offset:3px}
     `;
     root.prepend(style);
     document.documentElement.append(host);
@@ -676,6 +706,84 @@
     });
   }
 
+  function readPageProfile() {
+    const profile = ResumeData.profile({});
+    const experiences = ResumeData.experiences();
+    const warnings = ['仅读取当前页面已显示的资料；请展开需要的栏目。隐藏或打码信息不会导入。'];
+    const masked = value => /[*＊•●]{2,}|(?:\d|@)[xX]{3,}|[xX]{3,}(?:\d|@)/.test(value);
+    const clean = value => masked(value) || /^(请选择|请填写|未填写|添加|编辑)$/.test(value) ? '' : value.trim();
+    const counters = new Map();
+    const grouped = new Map();
+    const combined = [];
+    for (const field of queryAllDeep('input, textarea, select, [contenteditable="true"]')) {
+      if (!visibleForRead(field) || (field.matches('input') && !['', 'text', 'tel', 'email', 'url'].includes((field.type || '').toLowerCase()))) continue;
+      let value = field.tagName === 'SELECT' ? (field.value ? field.selectedOptions[0]?.textContent || '' : '') : (field.value ?? field.textContent ?? '');
+      value = clean(value);
+      if (!value) continue;
+      const info = experienceInfo(field);
+      if (info) {
+        if (info.key === 'all') { combined.push(`${experienceTitles[info.type]}\n${value}`); continue; }
+        const block = field.closest('fieldset, [data-experience-item], .resume-item, .experience-item');
+        const key = `${info.type}.${info.key}`;
+        let index;
+        if (block) {
+          if (!grouped.has(block)) grouped.set(block, {});
+          const group = grouped.get(block);
+          if (group[info.type] == null) { group[info.type] = experiences[info.type].length; experiences[info.type].push({}); }
+          index = group[info.type];
+        } else { index = counters.get(key) || 0; counters.set(key, index + 1); }
+        if (index >= 20) continue;
+        experiences[info.type][index] ||= {};
+        experiences[info.type][index][info.key] = value.slice(0, info.key === 'description' ? 10000 : 1000);
+      } else {
+        const key = keyForField(field);
+        if (key && !profile[key]) profile[key] = value.slice(0, key === 'summary' ? 10000 : 1000);
+      }
+    }
+    if (isBoss()) {
+      const root = [...document.querySelectorAll('.resume-online, .online-resume, .resume-content, #resume-online')].find(visibleForRead);
+      if (root) {
+        const selectors = {
+          name: '#resume-userinfo .name, .resume-userinfo .name, .userinfo .name, .user-name',
+          phone: '#resume-userinfo .tel, #resume-userinfo .phone, .resume-userinfo .tel, .resume-userinfo .phone, .userinfo .phone',
+          email: '#resume-userinfo .email, .resume-userinfo .email, .userinfo .email',
+          city: '#resume-userinfo .city, .resume-userinfo .city, .userinfo .city',
+          summary: '#resume-summary .text, .resume-summary .text, .resume-summary .content',
+          skills: '#resume-skills .text, .resume-skills .text'
+        };
+        for (const [key, selector] of Object.entries(selectors)) profile[key] ||= clean(visibleText(root, selector, key === 'summary' ? 10000 : 1000));
+        const sections = {
+          work: '#resume-work, .resume-work', education: '#resume-education, .resume-education', projects: '#resume-project, .resume-project'
+        };
+        const cardFields = {
+          work: { company: '.company-name, .company, .name', role: '.job-name, .job-title, .position', description: '.item-text .text, .description, .text' },
+          education: { school: '.school-name, .school, .name', degree: '.degree', major: '.major', description: '.description, .text' },
+          projects: { name: '.project-name, .name', role: '.role, .job-title', description: '.item-text .text, .description, .text' }
+        };
+        for (const [type, selector] of Object.entries(sections)) {
+          // Prefer filled edit forms when the same section is open for editing.
+          if (experiences[type].length) continue;
+          const section = [...root.querySelectorAll(selector)].find(visibleForRead);
+          if (!section) continue;
+          const cards = [...section.querySelectorAll('.resume-item, .item-primary')].filter(card => {
+            const parentCard = card.parentElement.closest('.resume-item, .item-primary');
+            return visibleForRead(card) && (!parentCard || parentCard === section || !section.contains(parentCard));
+          });
+          for (const card of cards.slice(0, 20)) {
+            const item = Object.fromEntries(Object.entries(cardFields[type]).map(([key, selectors]) => [key, clean(visibleText(card, selectors, key === 'description' ? 10000 : 1000))]));
+            const date = visibleText(card, '.period, .time, .date');
+            const match = date.match(/((?:19|20)\d{2}(?:[./年-]\d{1,2}月?)?)\s*(?:-|–|—|~|～|至|到)\s*((?:19|20)\d{2}(?:[./年-]\d{1,2}月?)?|至今|现在)/);
+            if (match) { item.startDate = match[1]; item.endDate = match[2]; }
+            if (Object.values(item).some(Boolean)) experiences[type].push(item);
+          }
+        }
+        profile.school ||= experiences.education[0]?.school || '';
+        profile.education ||= experiences.education[0]?.degree || '';
+      } else warnings.push('未识别到 BOSS 在线简历区域。请在“个人中心 → 在线简历”打开资料或编辑表单后重试。');
+    }
+    return { profile: ResumeData.profile(profile), experiences: ResumeData.experiences(experiences), resumeText: combined.join('\n\n'), warnings, source: isBoss() ? 'BOSS 在线简历' : location.hostname };
+  }
+
   function pageLooksLikeApplicationForm() {
     const matchedFields = collectFields().filter((field) => keyForField(field) || experienceInfo(field));
     const hasResumeUpload = queryAllDeep('input[type="file"]').some(isResumeFileInput);
@@ -702,6 +810,11 @@
   }
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'readPageProfile' || message.type === 'readPageJob') {
+      try { sendResponse(message.type === 'readPageProfile' ? readPageProfile() : pageIdentity()); }
+      catch (error) { sendResponse({ error: error.message }); }
+      return;
+    }
     if (message.type === 'previewResume') {
       try { sendResponse(preview(message.state)); }
       catch (error) { sendResponse({ error: error.message }); }

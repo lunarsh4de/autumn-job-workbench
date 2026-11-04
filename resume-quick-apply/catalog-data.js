@@ -63,9 +63,11 @@
   function classifyJobType(value = {}) {
     const explicit = text(value.jobType || value.type, 100);
     if (JOB_TYPES.includes(explicit)) return explicit;
-    const haystack = [value.title, value.tags, value.description, explicit].flat().join(' ').toLowerCase();
-    for (const [type, keywords] of JOB_TYPE_RULES) {
-      if (keywords.some(keyword => haystack.includes(keyword.toLowerCase()))) return type;
+    // Job titles describe the role; a skill in the description must not override that role.
+    for (const haystack of [text(value.title).toLowerCase(), [value.tags, value.description, explicit].flat().join(' ').toLowerCase()]) {
+      for (const [type, keywords] of JOB_TYPE_RULES) {
+        if (keywords.some(keyword => haystack.includes(keyword.toLowerCase()))) return type;
+      }
     }
     const tagText = (Array.isArray(value.tags) ? value.tags : [value.tags]).filter(Boolean).join(' ').toLowerCase();
     for (const [marker, type] of Object.entries(TAG_FALLBACK_TYPES)) {

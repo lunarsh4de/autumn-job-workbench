@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "投简历助手",
-  "version": "0.15.0",
+  "version": "0.18.0",
   "description": "从简历分类多类经历，在招聘网站快速填充，并在本地秋招工作台管理岗位进度。",
   "homepage_url": "https://github.com/lunarsh4de",
   "permissions": ["storage", "unlimitedStorage", "activeTab", "scripting", "contextMenus"],
@@ -13,6 +13,12 @@
   "background": {
     "service_worker": "service-worker.js"
   },
+  "content_scripts": [{
+    "matches": ["https://lunarsh4de.github.io/autumn-job-workbench/*"],
+    "js": ["workbench-bridge.js"],
+    "run_at": "document_start",
+    "all_frames": false
+  }],
   "commands": {
     "quick-fill": {
       "suggested_key": {

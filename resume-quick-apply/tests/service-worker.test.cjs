@@ -9,15 +9,15 @@ function event() {
 }
 
 function worker(state = {}, failFirstMessage = false) {
-  const events = { installed: event(), startup: event(), command: event(), clicked: event() };
+  const events = { installed: event(), startup: event(), command: event(), clicked: event(), message: event() };
   const messages = [];
   const injections = [];
   const badges = [];
   const menu = [];
   let attempts = 0;
   const chrome = {
-    runtime: { lastError: null, getURL: path => `chrome-extension://test/${path}`, onInstalled: events.installed, onStartup: events.startup },
-    storage: { local: { async get(keys) { return Object.fromEntries(keys.map(key => [key, structuredClone(state[key])])); } } },
+    runtime: { id: 'test', lastError: null, getURL: path => `chrome-extension://test/${path}`, onInstalled: events.installed, onStartup: events.startup, onMessage: events.message },
+    storage: { local: { async get(keys) { return Object.fromEntries(keys.map(key => [key, structuredClone(state[key])])); }, async set(patch) { await new Promise(resolve => setTimeout(resolve, 3)); Object.assign(state, structuredClone(patch)); } } },
     tabs: {
       async query() { return [{ id: 7, url: 'https://jobs.example.test/apply' }]; },
       async sendMessage(id, request) {
@@ -41,9 +41,9 @@ function worker(state = {}, failFirstMessage = false) {
       setTitle(options) { badges.push(['title', structuredClone(options)]); }
     }
   };
-  Function('chrome', 'importScripts', 'ResumeData', 'setTimeout', 'clearTimeout', source('service-worker.js'))(
-    chrome, () => {}, ResumeData, () => 1, () => {});
-  return { events, messages, injections, badges, menu };
+  Function('chrome', 'importScripts', 'ResumeData', 'TrackerData', 'WorkbenchData', 'setTimeout', 'clearTimeout', source('service-worker.js'))(
+    chrome, () => {}, ResumeData, require('../dashboard-data.js'), require('../workbench-data.js'), () => 1, () => {});
+  return { events, messages, injections, badges, menu, state, request(message, sender = { id: 'test' }) { return new Promise(resolve => events.message.fire(message, sender, resolve)); } };
 }
 
 test('install creates a scoped context menu', () => {
@@ -78,4 +78,17 @@ test('unrelated commands and context menu items do nothing', async () => {
   h.events.clicked.fire({ menuItemId: 'other-menu' }, { id: 9, url: 'https://career.example.test/job' });
   await new Promise(resolve => setTimeout(resolve, 10));
   assert.equal(h.messages.length, 0);
+});
+
+test('background serializes records from concurrent tabs and rejects foreign origins', async () => {
+  const h = worker({ activeProfileId: 'design', activeProfileLabel: '设计版' });
+  const send = (id, url = `https://jobs.test/${id}`) => h.request({ type: 'saveApplication', application: { url, title: `职位 ${id}`, company: '甲公司', status: 'submitted' } }, { id: 'test', tab: { id, url: `https://jobs.test/${id}` }, url: `https://jobs.test/${id}` });
+  const result = await Promise.all([send(1), send(2), send(3)]);
+  assert.ok(result.every(item => !item.error));
+  assert.equal(h.state.applications.length, 3);
+  assert.ok(h.state.applications.every(item => item.resumeProfileLabel === '设计版'));
+  assert.match((await send(4, 'https://foreign.test/4')).error, /当前网站/);
+  assert.equal(h.state.applications.length, 3);
+  await h.request({ type: 'clearApplications' });
+  assert.equal(h.state.applications.length, 0);
 });

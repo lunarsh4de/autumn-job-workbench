@@ -285,7 +285,7 @@ test('automatic record failure tells the user to use manual marking', async t =>
   await new Promise(resolve => setTimeout(resolve, 25));
   const status = h.document.getElementById('resume-quick-apply-root').shadowRoot.querySelector('.rqa-status');
   assert.match(status.textContent, /自动记录失败/);
-  assert.match(status.textContent, /标记已投递/);
+  assert.match(status.textContent, /记录当前岗位/);
   assert.equal(h.data.applications, undefined);
 });
 

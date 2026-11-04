@@ -57,6 +57,19 @@ test('catalog falls back to a bounded category for unknown new roles', () => {
   assert.equal(job.city, '上海');
 });
 
+test('role title takes precedence over incidental skills in the job description', () => {
+  assert.equal(C.item({ title: '工业设计师', description: '负责智能硬件外观与结构设计' }).jobType, '设计体验');
+  assert.equal(C.item({ title: '产品经理', description: '使用Python和数据分析支持决策' }).jobType, '产品项目');
+  assert.equal(C.item({ title: '岗位名称未细分', description: '嵌入式开发工程师' }).jobType, '技术研发');
+});
+
+test('featured company aliases match acronyms without matching words such as Senior', () => {
+  assert.equal(C.matchesCompany({ company: '上海蔚来汽车有限公司' }, '蔚来|NIO'), true);
+  assert.equal(C.matchesCompany({ company: 'NIO' }, '蔚来|NIO'), true);
+  assert.equal(C.matchesCompany({ company: '微软中国' }, '蔚来|NIO'), false);
+  assert.equal(C.matchesCompany({ company: 'Senior Research Lab' }, '蔚来|NIO'), false);
+});
+
 test('catalog classifies common bilingual job titles into bounded categories', () => {
   assert.equal(C.classifyJobType({ title: 'Product Operations Intern' }), '产品项目');
   assert.equal(C.classifyJobType({ title: 'Management Trainee' }), '职能管培');

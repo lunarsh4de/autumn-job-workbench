@@ -3,6 +3,7 @@
   const stages = [
     { id: 'watch', label: '关注', tone: 'slate' },
     { id: 'preparing', label: '准备中', tone: 'amber' },
+    { id: 'communicating', label: '已沟通', tone: 'blue' },
     { id: 'applied', label: '已投递', tone: 'blue' },
     { id: 'assessment', label: '笔试', tone: 'violet' },
     { id: 'interview', label: '面试', tone: 'orange' },
@@ -92,52 +93,49 @@
 
   function mergeApplications(existing, applications) {
     const merged = items(existing);
-    const urls = new Set(merged.map(entry => entry.url).filter(Boolean));
+    const canonical = url => globalThis.ResumeData?.applicationUrl(url) || webUrl(url);
+    const urls = new Map(merged.filter(entry => entry.url).map(entry => [canonical(entry.url), entry]));
     let added = 0;
     let updated = 0;
     for (const application of validApplications(applications)) {
-      const url = webUrl(application.url);
-      const existingIndex = merged.findIndex(entry => entry.url === url);
-      if (existingIndex >= 0) {
-        const current = merged[existingIndex];
-        const resumeProfileId = text(application.resumeProfileId, 80) || current.resumeProfileId;
-        const resumeProfileLabel = text(application.resumeProfileLabel, 80) || current.resumeProfileLabel;
-        const recordMode = application.source === 'auto' || application.source === 'manual' ? application.source : current.recordMode;
-        const next = item({
-          ...current,
-          title: text(application.title, 240) || current.title,
-          company: companyFor(application) || current.company,
-          stage: ['watch', 'preparing'].includes(current.stage) ? 'applied' : current.stage,
-          source: 'extension',
-          recordMode,
-          resumeProfileId,
-          resumeProfileLabel,
-          updatedAt: Math.max(current.updatedAt, application.createdAt)
-        });
-        const changed = next && ['title', 'company', 'stage', 'source', 'recordMode', 'resumeProfileId', 'resumeProfileLabel', 'updatedAt']
-          .some(key => next[key] !== current[key]);
-        if (changed) {
-          merged[existingIndex] = next;
-          updated++;
+      const url = canonical(application.url);
+      const stage = application.status === 'communicated' ? 'communicating' : application.status === 'recorded' ? 'preparing' : 'applied';
+      const timestamp = application.updatedAt || application.createdAt;
+      if (urls.has(url)) {
+        const previous = urls.get(url);
+        if (timestamp <= previous.updatedAt) continue;
+        const ranks = { watch: 0, preparing: 1, communicating: 2, applied: 3 };
+        if (ranks[previous.stage] != null && ranks[stage] > ranks[previous.stage]) previous.stage = stage;
+        if (previous.source === 'extension' || application.source === 'manual') {
+          for (const key of ['title', 'company', 'location', 'salary', 'notes']) if (application[key]) previous[key] = text(application[key], key === 'notes' ? 10000 : 240);
         }
+        previous.source = 'extension';
+        previous.recordMode = recordModes.has(application.source) ? application.source : previous.recordMode;
+        previous.resumeProfileId ||= text(application.resumeProfileId, 80);
+        previous.resumeProfileLabel ||= text(application.resumeProfileLabel, 80);
+        previous.updatedAt = timestamp;
+        updated++;
         continue;
       }
       const entry = item({
         id: stableId(`${url}|${application.createdAt}`),
         title: text(application.title, 240) || url,
         company: companyFor(application),
-        stage: 'applied',
+        stage,
+        location: application.location,
+        salary: application.salary,
+        notes: application.notes,
         url,
         resumeProfileId: text(application.resumeProfileId, 80),
         resumeProfileLabel: text(application.resumeProfileLabel, 80),
         source: 'extension',
         recordMode: application.source === 'auto' || application.source === 'manual' ? application.source : '',
         createdAt: application.createdAt,
-        updatedAt: application.createdAt
+        updatedAt: timestamp
       });
       if (entry) {
         merged.unshift(entry);
-        urls.add(url);
+        urls.set(url, entry);
         added++;
       }
     }
@@ -160,7 +158,28 @@
     return { total: list.length, active, thisWeek, interviews, offers, responseRate, counts };
   }
 
-  const api = { stages, item, items, companyFor, validApplications, mergeApplications, summary };
+  function attention(value, now = Date.now()) {
+    const result = [];
+    const soon = now + 7 * 86400000;
+    for (const entry of items(value)) {
+      if (['closed', 'offer'].includes(entry.stage)) continue;
+      const events = [
+        ['deadline', '申请截止', entry.deadline ? `${entry.deadline}T23:59:59` : '', ['watch', 'preparing'].includes(entry.stage)],
+        ['interview', '面试安排', entry.interviewAt, true],
+        ['followup', '主动跟进', entry.nextActionAt, true]
+      ];
+      for (const [type, label, date, allowed] of events) {
+        if (!allowed || !date) continue;
+        const at = new Date(date).getTime();
+        if (!Number.isFinite(at) || at > soon) continue;
+        // Past interviews remain in the timeline; only missed next actions and deadlines stay actionable.
+        if (type === 'interview' && at < now) continue;
+        result.push({ id: `${entry.id}-${type}`, jobId: entry.id, company: entry.company, title: entry.title, type, label, at, overdue: at < now });
+      }
+    }
+    return result.sort((a, b) => a.at - b.at || a.company.localeCompare(b.company));
+  }
+  const api = { stages, item, items, companyFor, validApplications, mergeApplications, summary, attention };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else globalThis.TrackerData = api;
 })();

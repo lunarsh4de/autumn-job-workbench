@@ -4,10 +4,24 @@
   const state = { items: [], query: '', view: 'catalog', boardPriority: 'all', jobsStage: 'all', jobsSort: 'updated' };
   let editorTrigger = null;
   const stageById = Object.fromEntries(TD.stages.map(stage => [stage.id, stage]));
-  const stageColors = { watch: '#75838b', preparing: '#ad741b', applied: '#3970cf', assessment: '#7459b7', interview: '#bd6b19', offer: '#24805d', closed: '#8b9499' };
+  const stageColors = { watch: '#75838b', preparing: '#ad741b', communicating: '#298a93', applied: '#3970cf', assessment: '#7459b7', interview: '#bd6b19', offer: '#24805d', closed: '#8b9499' };
   const dateFormat = new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit' });
   const dateTimeFormat = new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
   const weekdayFormat = new Intl.DateTimeFormat('zh-CN', { weekday: 'long' });
+  let editorValues;
+  const sync = globalThis.WorkbenchSync?.create({
+    storage,
+    onItems(items) { state.items = items; renderAll(); },
+    onStatus({ connected, message, pending, error }) {
+      document.querySelector('#sync-status').textContent = message;
+      document.querySelector('#sync-status').dataset.error = String(error);
+      document.querySelector('#sync-label').textContent = connected ? '插件已连接' : '本机保存';
+      document.querySelector('#sync-summary').textContent = pending ? `${pending} 项待同步` : connected ? '岗位与进度双向同步' : '连接后自动补同步';
+      document.querySelector('#sync-dot').classList.toggle('connected', connected);
+      document.querySelector('#disconnect-extension').hidden = !connected;
+      document.querySelector('#connect-extension').textContent = connected ? '立即同步' : '连接插件 / 重试';
+    }
+  });
 
   function createStorage() {
     if (globalThis.chrome?.storage?.local) return chrome.storage.local;
@@ -113,8 +127,9 @@
     const target = new Date(value);
     if (!Number.isFinite(target.getTime())) return '未安排下一步';
     const diff = target.getTime() - Date.now();
-    const days = Math.ceil(diff / 86400000);
-    if (days < 0) return `已逾期 ${Math.abs(days)} 天`;
+    const current = new Date();
+    const days = Math.round((Date.UTC(target.getFullYear(), target.getMonth(), target.getDate()) - Date.UTC(current.getFullYear(), current.getMonth(), current.getDate())) / 86400000);
+    if (diff < 0) return days < 0 ? `已逾期 ${Math.abs(days)} 天` : '今天已到期';
     if (days === 0) return `今天 ${String(target.getHours()).padStart(2, '0')}:${String(target.getMinutes()).padStart(2, '0')}`;
     if (days === 1) return '明天';
     if (days <= 7) return `${days} 天后`;
@@ -137,8 +152,9 @@
     return badge;
   }
 
-  async function persist(message) {
-    await storage.set({ jobTrackerItems: state.items });
+  async function persist(message, options) {
+    if (sync) await sync.save(state.items, options);
+    else await storage.set({ jobTrackerItems: state.items });
     if (message) flash(message);
   }
 
@@ -176,6 +192,7 @@
     renderJobs();
     renderCompanies();
     renderCalendar();
+    renderAttention();
     renderProfileCenter();
   }
 
@@ -496,14 +513,40 @@
     state.view = name;
     for (const candidate of document.querySelectorAll('.view')) candidate.hidden = candidate !== view;
     for (const item of document.querySelectorAll('[data-view]')) item.classList.toggle('active', item.dataset.view === name);
+    for (const item of document.querySelectorAll('[data-view]')) {
+      if (item.dataset.view === name) item.setAttribute('aria-current', 'page'); else item.removeAttribute('aria-current');
+    }
+    document.querySelector('#global-search').placeholder = name === 'catalog' ? '搜索岗位库' : '搜索我的申请';
+    document.querySelector('#global-search').value = name === 'catalog' ? document.querySelector('#catalog-search').value : state.query;
     document.querySelector('#view-title').textContent = view.dataset.title;
     setSidebarOpen(false);
     if (wasSidebarOpen) document.querySelector('#mobile-menu')?.focus();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  function renderAttention() {
+    const all = TD.attention(state.items);
+    const visible = TD.attention(filteredItems());
+    document.querySelector('#nav-attention-count').textContent = String(all.length);
+    document.querySelector('#attention-summary').textContent = `${visible.length} 项待处理 · ${visible.filter(item => item.overdue).length} 项已到期`;
+    const root = document.querySelector('#attention-list');
+    root.replaceChildren();
+    if (!visible.length) { root.append(empty('暂无待处理事项。在岗位详情中设置下一步时间或面试时间，这里会自动整理。')); return; }
+    for (const event of visible) {
+      const card = element('article', `attention-item${event.overdue ? ' overdue' : ''}`);
+      const date = element('div', 'attention-date');
+      date.append(element('strong', '', event.overdue ? '已到期' : relativeTime(event.at)), element('small', '', formatDate(event.at, true)));
+      const copy = element('div', 'attention-copy');
+      copy.append(element('strong', '', `${event.label} · ${event.company}`), element('span', '', event.title));
+      const button = element('button', 'button secondary', '查看 / 调整'); button.type = 'button'; button.dataset.editId = event.jobId;
+      button.setAttribute('aria-label', `调整${event.company}的${event.label}`);
+      card.append(date, copy, button); root.append(card);
+    }
+  }
+
   function openEditor(entry, trigger = null) {
     editorTrigger = trigger && typeof trigger.focus === 'function' ? trigger : null;
+
     const form = document.querySelector('#job-form');
     form.reset();
     form.elements.namedItem('priority').value = 'normal';
@@ -518,6 +561,7 @@
       form.elements.namedItem('interviewAt').value = dateTimeValue(entry.interviewAt);
     }
     document.querySelector('#job-dialog').showModal();
+    editorValues = Object.fromEntries(new FormData(form));
     form.elements.namedItem('company').focus();
   }
 
@@ -539,10 +583,12 @@
     const form = document.querySelector('#job-form');
     const values = Object.fromEntries(new FormData(form));
     const existing = state.items.find(entry => entry.id === values.id);
+    if (values.id && !existing) throw new Error('此岗位已在另一处删除。请关闭编辑窗口。');
+    const changes = existing && editorValues ? Object.fromEntries(Object.entries(values).filter(([key, value]) => value !== editorValues[key])) : values;
     const now = Date.now();
     const candidate = TD.item({
       ...existing,
-      ...values,
+      ...changes,
       id: existing?.id || `job-${now.toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
       source: existing?.source || 'manual',
       createdAt: existing?.createdAt || now,
@@ -656,8 +702,17 @@
       saveForm().catch(error => flash(error.message || '保存失败。', true));
     });
     document.querySelector('#global-search').addEventListener('input', event => {
+      if (state.view === 'catalog') return;
       state.query = event.target.value.trim().toLowerCase();
       renderAll();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && document.querySelector('#sidebar').classList.contains('open')) {
+        document.querySelector('#sidebar').classList.remove('open');
+        document.querySelector('#mobile-menu').setAttribute('aria-expanded', 'false');
+        document.querySelector('#mobile-menu').focus();
+      }
+      if (!document.querySelector('dialog[open]') && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); document.querySelector('#global-search').focus(); }
     });
     document.querySelector('#board-priority').addEventListener('change', event => { state.boardPriority = event.target.value; renderBoard(); });
     document.querySelector('#jobs-stage').addEventListener('change', event => { state.jobsStage = event.target.value; renderJobs(); });
@@ -708,13 +763,46 @@
     document.querySelector('#open-popup').addEventListener('click', () => {
       if (globalThis.chrome?.runtime?.id && globalThis.chrome?.tabs?.create) {
         chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
-      } else showView('sources');
+      } else if (sync) sync.openProfile().catch(error => flash(error.message, true));
+      else showView('sources');
+    });
+    document.querySelector('#connect-extension')?.addEventListener('click', () => sync?.connect());
+    document.querySelector('#disconnect-extension')?.addEventListener('click', () => sync?.disconnect().catch(error => flash(error.message, true)));
+    document.querySelector('#backup-workbench')?.addEventListener('click', () => {
+      const blob = new Blob([JSON.stringify({ schema: 'resume-workbench', version: 1, exportedAt: Date.now(), items: state.items }, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a'); link.href = url; link.download = `求职工作台完整备份-${new Date().toISOString().slice(0, 10)}.json`; link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      flash('已导出完整岗位备份（含备注、日程和阶段）。');
+    });
+    document.querySelector('#restore-workbench')?.addEventListener('change', async event => {
+      const file = event.target.files[0];
+      try {
+        if (!file) return;
+        if (file.size > 20000000) throw new Error('备份超过 20 MB，请检查文件。');
+        const backup = JSON.parse(await file.text());
+        if (backup.schema !== 'resume-workbench' || backup.version !== 1 || !Array.isArray(backup.items) || backup.items.length > 1000 || backup.items.some(item => !TD.item(item))) throw new Error('不是受支持的工作台完整备份。');
+        const incoming = TD.items(backup.items);
+        if (!confirm(`将合并 ${incoming.length} 个岗位；相同岗位按更新时间保留较新记录。继续？`)) return;
+        const combined = [...state.items];
+        for (const item of incoming) {
+          const index = combined.findIndex(entry => entry.id === item.id || item.url && ResumeData.applicationUrl(entry.url) === ResumeData.applicationUrl(item.url));
+          if (index < 0) combined.push(item);
+          else if (item.updatedAt > combined[index].updatedAt) combined[index] = { ...item, id: combined[index].id };
+        }
+        if (combined.length > 1000) throw new Error('合并后超过 1000 个岗位，请整理后重试。');
+        state.items = combined;
+        await persist('备份已合并，本机保存后自动同步。', { restore: true }); renderAll();
+      } catch (error) { flash(`恢复失败：${error.message}`, true); }
+      finally { event.target.value = ''; }
     });
     document.querySelector('#profile-open-popup').addEventListener('click', () => {
       if (globalThis.chrome?.runtime?.id && globalThis.chrome?.tabs?.create) {
         chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
-      } else showView('sources');
+      } else if (sync) sync.openProfile().catch(error => flash(error.message, true));
+      else showView('sources');
     });
+    document.querySelector('#open-local-workbench')?.addEventListener('click', () => sync?.openLocalWorkbench().catch(error => flash(error.message, true)));
     setSidebarOpen(false);
     window.addEventListener('resize', () => {
       if (!sidebar.classList.contains('open')) setSidebarOpen(false);
@@ -734,14 +822,21 @@
   }
 
   async function load() {
-    const saved = await storage.get(['jobTrackerItems', 'applications', 'resumeProfiles', 'activeProfileId', 'activeProfileLabel', 'profile', 'experiences']);
-    setResumeSyncStatus(saved);
+    const resumeSaved = await storage.get(['resumeProfiles', 'activeProfileId', 'activeProfileLabel', 'profile', 'experiences']);
+    setResumeSyncStatus(resumeSaved);
+    if (sync) {
+      await sync.start();
+      setInterval(() => { renderAttention(); }, 60000);
+      return;
+    }
+    const saved = await storage.get(['jobTrackerItems', 'applications']);
     const merged = TD.mergeApplications(saved.jobTrackerItems, saved.applications);
     const enriched = await enrichCatalogMetadata(merged.items);
     state.items = enriched.items;
     if (merged.added || merged.updated || enriched.changed || !Array.isArray(saved.jobTrackerItems)) await storage.set({ jobTrackerItems: state.items });
     renderAll();
-    if (merged.added || merged.updated || enriched.changed) flash(`已从插件同步 ${merged.added ? `${merged.added} 个新岗位` : ''}${merged.added && merged.updated ? '，' : ''}${merged.updated ? `${merged.updated} 个岗位状态` : ''}${enriched.changed ? '，并补充岗位库分类' : ''}。`);
+    setInterval(() => { renderAttention(); }, 60000);
+    if (merged.added) flash(`已从插件同步 ${merged.added} 个新岗位。`);
   }
 
   populateStages();
@@ -761,7 +856,7 @@
       if (area !== 'local') return;
       const resumeKeys = ['resumeProfiles', 'activeProfileId', 'activeProfileLabel', 'profile', 'experiences'];
       if (resumeKeys.some(key => changes[key])) storage.get(resumeKeys).then(setResumeSyncStatus).catch(() => {});
-      if (!changes.applications) return;
+      if (sync || !changes.applications) return;
       (async () => {
         const merged = TD.mergeApplications(state.items, changes.applications.newValue);
         const enriched = await enrichCatalogMetadata(merged.items);

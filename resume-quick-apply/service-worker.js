@@ -1,7 +1,83 @@
-importScripts('data.js');
+importScripts('data.js', 'dashboard-data.js', 'workbench-data.js');
 
 const MENU_ID = 'resume-quick-apply-fill';
 const badgeTimers = new Map();
+const applicationQueue = ResumeData.createQueue();
+
+// A single background writer prevents two tabs from overwriting each other's records.
+chrome.runtime.onMessage.addListener((message, sender, respond) => {
+  if (!['saveApplication', 'clearApplications', 'workbenchSync'].includes(message?.type)) return;
+  if (sender.id !== chrome.runtime.id) return;
+  const extensionPage = (sender.url || '').startsWith(chrome.runtime.getURL('')) && (sender.frameId || 0) === 0;
+  if (message.type === 'workbenchSync') {
+    const internal = extensionPage;
+    if (!internal && (!sender.tab || !WorkbenchData.trustedSite(sender.url) || (sender.frameId || 0) !== 0)) return;
+    applicationQueue(() => synchronizeWorkbench(message, internal)).then(respond).catch(error => respond({ error: error.message }));
+    return true;
+  }
+  if (message.type === 'clearApplications' && sender.tab && !extensionPage) return;
+  applicationQueue(async () => {
+    if (message.type === 'clearApplications') {
+      const saved = await chrome.storage.local.get(['applications', 'jobTrackerItems', 'workbenchDeleted']);
+      const urls = new Set(ResumeData.applications(saved.applications).map(WorkbenchData.key));
+      const deleted = { ...(saved.workbenchDeleted || {}) };
+      for (const url of urls) deleted[url] = Date.now();
+      const tracker = TrackerData.items(saved.jobTrackerItems).filter(item => !urls.has(WorkbenchData.key(item)));
+      await chrome.storage.local.set({ applications: [], jobTrackerItems: tracker, workbenchDeleted: deleted });
+      return { applications: [] };
+    }
+    const saved = await chrome.storage.local.get(['applications', 'activeProfileId', 'activeProfileLabel', 'jobTrackerItems', 'workbenchDeleted']);
+    const candidate = { ...message.application, createdAt: Date.now(), updatedAt: Date.now() };
+    if (sender.tab && !extensionPage) {
+      const origin = new URL(sender.url || sender.tab.url).origin;
+      if (new URL(candidate.url).origin !== origin) throw new Error('岗位链接必须属于当前网站。');
+    }
+    candidate.resumeProfileId ||= saved.activeProfileId || '';
+    candidate.resumeProfileLabel ||= saved.activeProfileLabel || '默认简历';
+    if (candidate.source === 'auto' && saved.workbenchDeleted?.[WorkbenchData.key(candidate)]) return { applications: ResumeData.applications(saved.applications), added: false };
+    const result = ResumeData.mergeApplication(saved.applications, candidate);
+    // An explicit new capture can restore a previously deleted URL. Stale website tabs cannot.
+    const deleted = { ...(saved.workbenchDeleted || {}) };
+    delete deleted[WorkbenchData.key(candidate)];
+    const tracker = TrackerData.mergeApplications(saved.jobTrackerItems, result.applications).items;
+    result.applications = WorkbenchData.projectApplications(result.applications, tracker);
+    await chrome.storage.local.set({ applications: result.applications, jobTrackerItems: tracker, workbenchDeleted: deleted });
+    return result;
+  }).then(respond).catch(error => respond({ error: error.message }));
+  return true;
+});
+
+async function synchronizeWorkbench(message, internal) {
+  const saved = await chrome.storage.local.get(['applications', 'jobTrackerItems', 'workbenchConnected', 'workbenchDeleted', 'workbenchSeen']);
+  const connected = internal || saved.workbenchConnected === true;
+  if (message.action === 'status') return { connected, version: chrome.runtime.getManifest?.().version || '0.18.0' };
+  if (message.action === 'disconnect') {
+    await chrome.storage.local.set({ workbenchConnected: false });
+    return { connected: false };
+  }
+  if (['openProfile', 'openLocalWorkbench'].includes(message.action)) {
+    await chrome.tabs.create({ url: chrome.runtime.getURL(message.action === 'openProfile' ? 'popup.html' : 'dashboard.html') });
+    return { connected };
+  }
+  if (!connected && message.action !== 'connect') throw new Error('请先点击“连接插件”，在当前浏览器启用同步。');
+  if (!['connect', 'pull', 'commit'].includes(message.action)) throw new Error('未知同步操作。');
+  const deleted = saved.workbenchDeleted || {};
+  const applications = ResumeData.applications(saved.applications).filter(item => !deleted[WorkbenchData.key(item)]);
+  const merged = TrackerData.mergeApplications(saved.jobTrackerItems, applications).items;
+  const result = WorkbenchData.apply({ items: merged, deleted, seen: saved.workbenchSeen }, message.action === 'commit' ? message.operations : []);
+  const remaining = applications.filter(application => !result.deleted[WorkbenchData.key(application)]);
+  const patch = {
+    jobTrackerItems: result.items,
+    applications: WorkbenchData.projectApplications(remaining, result.items),
+    workbenchDeleted: result.deleted,
+    workbenchSeen: result.seen
+  };
+  if (message.action === 'connect') patch.workbenchConnected = true;
+  // Avoid storage-change / pull loops when a snapshot has not changed.
+  const changed = Object.fromEntries(Object.entries(patch).filter(([key, value]) => JSON.stringify(saved[key]) !== JSON.stringify(value)));
+  if (Object.keys(changed).length) await chrome.storage.local.set(changed);
+  return { connected: true, items: result.items, conflicts: result.conflicts, syncedAt: Date.now() };
+}
 
 function configureContextMenu() {
   chrome.contextMenus.removeAll(() => {

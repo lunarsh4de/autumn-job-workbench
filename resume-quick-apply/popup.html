@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>投简历助手</title>
-    <link rel="stylesheet" href="popup.css" />
+    <link rel="stylesheet" href="popup.css?v=0.18.0" />
   </head>
   <body>
     <main class="app-shell">
@@ -13,28 +13,15 @@
           <span class="brand-mark"><img src="icons/briefcase-business.svg" alt="" /></span>
           <div>
             <h1>投简历助手</h1>
-            <p>Quick Apply</p>
+            <p>求职信息，随手有序</p>
           </div>
         </div>
         <div class="header-actions">
-          <span id="version-badge" class="version-badge">v0.15.0</span>
-          <span class="local-badge"><img src="icons/shield-check.svg" alt="" />本地保存</span>
+          <span id="version-badge" class="version-badge">v0.18.0</span>
+
           <button id="open-dashboard" class="dashboard-button" type="button"><img src="icons/layout-dashboard.svg" alt="" />工作台</button>
         </div>
       </header>
-
-      <section class="page-context" aria-label="当前页面">
-        <span class="context-icon"><img src="icons/briefcase-business.svg" alt="" /></span>
-        <div class="context-copy">
-          <span>当前页面</span>
-          <strong id="page-title">正在识别…</strong>
-          <small id="page-host"></small>
-        </div>
-        <span id="page-capability" class="status-badge" data-status="loading">检测中</span>
-      </section>
-
-      <div id="message" class="toast" role="status" aria-live="polite" hidden></div>
-
       <nav class="tabs" role="tablist" aria-label="功能导航">
         <button class="tab-button active" id="tab-quick" type="button" role="tab" aria-selected="true" aria-controls="panel-quick" data-tab="quick">
           <img src="icons/zap.svg" alt="" />投递
@@ -50,22 +37,71 @@
         </button>
       </nav>
 
+      <section class="page-context" aria-label="当前页面">
+        <span class="context-icon"><img src="icons/briefcase-business.svg" alt="" /></span>
+        <div class="context-copy">
+          <span>当前页面</span>
+          <strong id="page-title">正在识别…</strong>
+          <small id="page-host"></small>
+        </div>
+        <span id="page-capability" class="status-badge" data-status="loading">检测中</span>
+      </section>
+
+      <div id="message" class="toast" role="status" aria-live="polite" hidden></div>
+
+
+
       <section class="tab-panel active" id="panel-quick" role="tabpanel" aria-labelledby="tab-quick">
         <section class="quick-intake" aria-label="从简历开始">
           <div class="quick-intake-icon"><img src="icons/upload.svg" alt="" /></div>
           <div class="quick-intake-copy">
-            <p class="overline">START HERE</p>
+            <p class="overline">开始使用</p>
             <h2>先上传简历，自动整理资料</h2>
             <p id="quick-import-status">本地解析 PDF、DOCX 或 TXT，确认后再保存</p>
           </div>
           <button id="quick-import-button" class="button primary" type="button">上传并解析</button>
         </section>
+        <div id="active-resume-strip" class="active-resume-strip" hidden><img src="icons/file-text.svg" alt="" /><span><small>本次使用</small><strong id="quick-profile-label">默认简历</strong></span><button class="text-button" type="button" data-open-tab="profile">切换 / 编辑</button></div>
+        <div id="current-job-record" class="current-job-record" hidden></div>
+        <section class="primary-actions" aria-label="填写操作">
+          <button id="fill-button" class="button primary command" type="button">
+            <img src="icons/zap.svg" alt="" /><span><strong>填充当前页面</strong><small>保留网页中已有内容</small></span>
+          </button>
+          <div class="action-grid">
+            <button id="preview-button" class="button secondary" type="button"><img src="icons/scan-search.svg" alt="" />预览字段</button>
+            <button id="undo-button" class="button secondary" type="button"><img src="icons/undo-2.svg" alt="" />撤销填写</button>
+          </div>
+        </section>
+
+
+        <section class="page-tools" aria-label="网页资料与投递记录">
+          <div class="action-grid">
+            <button id="capture-job" class="button secondary" type="button"><img src="icons/plus.svg" alt="" />保存当前岗位</button>
+            <button id="import-page-profile" class="button secondary" type="button"><img src="icons/file-up.svg" alt="" />导入网页资料</button>
+          </div>
+          <details class="help-disclosure"><summary>记录和导入怎么使用？</summary><p>岗位页保存记录；BOSS 在线简历页可导入已填写资料。启用本页助手后，出现明确投递成功提示才自动记录；沟通记录需手动保存。</p></details>
+        </section>
+
+        <form id="job-capture-form" class="import-preview" hidden>
+          <strong id="capture-heading">核对岗位信息</strong>
+          <p id="job-capture-hint" class="result-note"></p>
+          <div class="field-grid">
+            <label>岗位名称<input id="capture-title" required maxlength="240" /></label>
+            <label>公司<input id="capture-company" required maxlength="160" /></label>
+            <label>地点<input id="capture-location" maxlength="120" /></label>
+            <label>薪资<input id="capture-salary" maxlength="120" /></label>
+            <label class="wide">岗位链接<input id="capture-url" type="url" required /></label>
+            <label class="wide">当前状态<select id="capture-status"><option value="recorded">已记录（尚未确认投递）</option><option value="communicated">已沟通</option><option value="submitted">已投递（我已确认完成）</option></select></label>
+            <label class="wide">备注<textarea id="capture-notes" maxlength="10000" rows="2" placeholder="联系人、投递渠道或下一步安排"></textarea></label>
+          </div>
+          <div class="import-actions"><button id="save-captured-job" class="button primary" type="submit">确认保存记录</button><button id="cancel-captured-job" class="button quiet" type="button">取消</button></div>
+        </form>
 
         <section class="readiness" aria-label="投递准备情况">
           <div class="section-title-row">
             <div>
-              <p class="overline">READY CHECK</p>
-              <h2>投递准备</h2>
+              <p class="overline">当前简历</p>
+              <h2>资料完整度</h2>
             </div>
             <strong id="profile-score">0%</strong>
           </div>
@@ -82,15 +118,7 @@
           </div>
         </section>
 
-        <section class="primary-actions" aria-label="填写操作">
-          <button id="fill-button" class="button primary command" type="button">
-            <img src="icons/zap.svg" alt="" /><span><strong>填充当前页面</strong><small>保留网页中已有内容</small></span>
-          </button>
-          <div class="action-grid">
-            <button id="preview-button" class="button secondary" type="button"><img src="icons/scan-search.svg" alt="" />预览字段</button>
-            <button id="undo-button" class="button secondary" type="button"><img src="icons/undo-2.svg" alt="" />撤销填写</button>
-          </div>
-        </section>
+
 
         <section id="preview" class="result-panel" hidden aria-label="填写预览">
           <div class="result-heading">
@@ -111,7 +139,7 @@
       <section class="tab-panel" id="panel-profile" role="tabpanel" aria-labelledby="tab-profile" hidden>
         <form id="profile-form">
           <section class="profile-switcher" aria-label="岗位定制简历">
-            <div class="section-title-row compact"><div><p class="overline">RESUME PROFILES</p><h2>岗位定制简历</h2></div><span id="resume-profile-status" aria-live="polite"></span></div>
+            <div class="section-title-row compact"><div><p class="overline">简历档案</p><h2>岗位定制简历</h2></div><span id="resume-profile-status" aria-live="polite"></span></div>
             <div class="profile-switcher-controls">
               <label>当前档案<select id="resume-profile-select" aria-label="选择当前简历档案"></select></label>
               <button id="new-resume-profile" class="button secondary" type="button"><img src="icons/plus.svg" alt="" />新建</button>
@@ -121,7 +149,7 @@
             <p class="profile-switcher-note">每份档案独立保存资料、经历和附件。切换档案后，网页填充会使用当前档案。</p>
           </section>
           <div class="section-title-row compact">
-            <div><p class="overline">PROFILE</p><h2>个人资料</h2></div>
+            <div><p class="overline">基础资料</p><h2>个人资料</h2></div>
             <span id="save-state" aria-live="polite"></span>
           </div>
           <section id="setup-hint" class="setup-hint" hidden>
@@ -167,21 +195,27 @@
 
       <section class="tab-panel" id="panel-history" role="tabpanel" aria-labelledby="tab-history" hidden>
         <div class="section-title-row compact">
-          <div><p class="overline">APPLICATIONS</p><h2>最近投递</h2></div>
+          <div><p class="overline">投递进度</p><h2>投递记录</h2></div>
           <div class="history-tools">
             <button id="export-history" class="text-button" type="button"><img src="icons/download.svg" alt="" />导出记录</button>
             <button id="export-companies" class="text-button" type="button"><img src="icons/download.svg" alt="" />导出公司</button>
             <button id="clear-history" class="text-button danger-text" type="button">清空</button>
           </div>
         </div>
+        <div class="history-filters">
+          <label class="history-search">搜索记录<input id="history-search" type="search" placeholder="公司、岗位、备注或简历档案" autocomplete="off" /></label>
+          <label>状态<select id="history-status"><option value="all">全部状态</option><option value="recorded">已记录</option><option value="communicated">已沟通</option><option value="submitted">已投递</option></select></label>
+        </div>
+        <div class="history-result-line"><span id="history-result-count" role="status"></span><button id="reset-history-filters" class="text-button" type="button">重置筛选</button></div>
         <ul id="application-list" class="application-list"><li class="empty-state">还没有投递记录</li></ul>
+        <button id="history-more" class="button secondary history-more" type="button" hidden>显示更多记录</button>
         <div class="company-summary-heading"><strong>已投公司</strong><span>按公司汇总</span></div>
         <ul id="company-list" class="company-list"><li class="empty-state">还没有公司记录</li></ul>
       </section>
 
       <section class="tab-panel" id="panel-experiences" role="tabpanel" aria-labelledby="tab-experiences" hidden>
         <div class="section-title-row compact">
-          <div><p class="overline">EXPERIENCES</p><h2>分类经历</h2></div>
+          <div><p class="overline">结构化简历</p><h2>分类经历</h2></div>
           <span id="experience-save-state" aria-live="polite"></span>
         </div>
 
@@ -197,6 +231,7 @@
         <section id="resume-import-preview" class="import-preview" hidden>
           <strong>分类预览</strong>
           <p id="resume-import-summary"></p>
+          <pre id="resume-import-details" class="import-details" aria-label="将导入的资料明细"></pre>
           <label class="inline-check"><input id="resume-import-replace" type="checkbox" />替换已有经历和已填写的基础资料</label>
           <label id="resume-import-attachment-row" class="inline-check"><input id="resume-import-save-attachment" type="checkbox" checked />同时保存为投递附件</label>
           <label class="inline-check"><input id="resume-import-new-profile" type="checkbox" />导入为新的简历档案，保留当前档案</label>
@@ -210,11 +245,11 @@
         <div id="experience-sections"></div>
       </section>
 
-      <footer class="author-credit">作者：<a href="https://github.com/lunarsh4de" target="_blank" rel="noopener noreferrer">Lunarsh4de · GitHub</a></footer>
+      <footer class="author-credit"><span><img src="icons/shield-check.svg" alt="" />资料仅保存在本机</span>作者：<a href="https://github.com/lunarsh4de" target="_blank" rel="noopener noreferrer">Lunarsh4de · GitHub</a></footer>
     </main>
-    <script src="vendor/mammoth.browser.min.js"></script>
-    <script src="data.js"></script>
-    <script src="resume-parser.js"></script>
-    <script src="popup.js"></script>
+    <script src="vendor/mammoth.browser.min.js?v=0.18.0"></script>
+    <script src="data.js?v=0.18.0"></script>
+    <script src="resume-parser.js?v=0.18.0"></script>
+    <script src="popup.js?v=0.18.0"></script>
   </body>
 </html>

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const extensionRoot = resolve(process.env.RQA_EXTENSION_ROOT || resolve(here, '..'));
-const profileRoot = process.env.RQA_EDGE_PROFILE ? resolve(process.env.RQA_EDGE_PROFILE) : resolve(here, '..', '..', 'output', 'edge-smoke-0.15.0');
+const profileRoot = process.env.RQA_EDGE_PROFILE ? resolve(process.env.RQA_EDGE_PROFILE) : resolve(here, '..', '..', 'output', 'edge-smoke-0.18.0');
 const screenshotRoot = resolve(here, '..', '..', 'output');
 const resumeFixture = process.env.RQA_RESUME_FIXTURE ? resolve(process.env.RQA_RESUME_FIXTURE) : null;
 const edgeCandidates = [
@@ -107,7 +107,7 @@ try {
   });
   const extension = probe.result.value;
   if (!extension || extension.name !== '投简历助手') throw new Error(`Edge extension target did not expose the expected manifest. Target: ${extensionTarget.url} Probe: ${JSON.stringify(extension)} Log: ${edgeLog.slice(-4000)}`);
-  if (extension.version !== '0.15.0') throw new Error(`Unexpected Edge extension version: ${extension.version}`);
+  if (extension.version !== '0.18.0') throw new Error(`Unexpected Edge extension version: ${extension.version}`);
   if (extension.shortcut !== 'Alt+Shift+F') throw new Error(`Unexpected quick-fill shortcut: ${extension.shortcut}`);
   const popup = await client.send('Runtime.evaluate', {
     expression: `({ title: document.title, fill: !!document.querySelector('#fill-button'), profile: !!document.querySelector('#profile-form'), quickAttachment: !!document.querySelector('#quick-attachment'), profileSelect: !!document.querySelector('#resume-profile-select'), tabs: document.querySelectorAll('[role="tab"]').length })`,

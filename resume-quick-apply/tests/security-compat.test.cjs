@@ -3,22 +3,20 @@ const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const { content, popup, source, until } = require('./helpers.cjs');
 
-test('manifest keeps job-page access temporary and limits cloud backup hosts to GitHub', () => {
+test('recruiting sites use active-tab access; persistent bridge is scoped to the companion path', () => {
   const manifest = JSON.parse(source('manifest.json'));
-  assert.equal(manifest.version, '0.15.0');
+  assert.equal(manifest.version, '0.18.0');
   assert.equal(manifest.homepage_url, 'https://github.com/lunarsh4de');
   assert.deepEqual(manifest.permissions.sort(), ['activeTab', 'contextMenus', 'scripting', 'storage', 'unlimitedStorage'].sort());
   assert.deepEqual(manifest.host_permissions.sort(), ['https://api.github.com/*', 'https://github.com/*'].sort());
-  assert.equal(manifest.content_scripts, undefined);
+  assert.deepEqual(manifest.content_scripts, [{ matches: ['https://lunarsh4de.github.io/autumn-job-workbench/*'], js: ['workbench-bridge.js'], run_at: 'document_start', all_frames: false }]);
   assert.deepEqual(manifest.web_accessible_resources[0].matches, ['http://*/*', 'https://*/*']);
   assert.equal(manifest.commands['quick-fill'].suggested_key.default, 'Alt+Shift+F');
 });
 
 test('release surfaces show the current version and author link', () => {
-  assert.match(source('popup.html'), /v0\.15\.0/);
-  assert.match(source('popup.js'), /0\.15\.0/);
-  assert.match(source('onboarding.html'), /v0\.15\.0/);
-  assert.match(source('install/install-guide.html'), /v0\.15\.0/);
+  const version = JSON.parse(source('manifest.json')).version;
+  for (const file of ['popup.html', 'popup.js', 'onboarding.html', 'install/install-guide.html']) assert.ok(source(file).includes(version));
   for (const file of ['popup.html', 'onboarding.html', 'dashboard.html', 'install/install-guide.html']) {
     assert.match(source(file), /https:\/\/github\.com\/lunarsh4de/);
     assert.match(source(file), /target="_blank" rel="noopener noreferrer"/);
@@ -270,7 +268,7 @@ test('first-install onboarding opens only for install, not update', () => {
   const calls = [];
   const event = () => ({ addListener() {} });
   const chrome = {
-    runtime: { lastError: null, getURL: path => `chrome-extension://test/${path}`, onInstalled: { addListener(fn) { installed = fn; } }, onStartup: event() },
+    runtime: { lastError: null, getURL: path => `chrome-extension://test/${path}`, onInstalled: { addListener(fn) { installed = fn; } }, onStartup: event(), onMessage: event() },
     tabs: { create(input) { calls.push(input); } }, commands: { onCommand: event() },
     contextMenus: { removeAll(callback) { callback(); }, create(options, callback) { callback(); }, onClicked: event() }
   };

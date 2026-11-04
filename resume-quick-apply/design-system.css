@@ -1,0 +1,43 @@
+/* Quick Apply / Calm Desk. Source of truth: DESIGN_SYSTEM.md. */
+:root {
+  color-scheme: light;
+  --qa-ink: #182b34;
+  --qa-muted: #526873;
+  --qa-line: #d7e1e6;
+  --qa-surface: #ffffff;
+  --qa-canvas: #f3f6f8;
+  --qa-soft: #edf3f5;
+  --qa-accent: #116b61;
+  --qa-accent-dark: #0c514a;
+  --qa-accent-soft: #e5f3ef;
+  --qa-blue: #245bb6;
+  --qa-warning: #8b500b;
+  --qa-danger: #a22d3c;
+  --qa-focus: #245bb6;
+  --qa-radius: 10px;
+  --qa-shadow: 0 2px 6px rgb(24 43 52 / 4%);
+  --ink: var(--qa-ink);
+  --muted: var(--qa-muted);
+  --line: var(--qa-line);
+  --surface: var(--qa-surface);
+  --canvas: var(--qa-canvas);
+  --soft: var(--qa-soft);
+  --accent: var(--qa-accent);
+  --accent-dark: var(--qa-accent-dark);
+  --blue: var(--qa-blue);
+  --danger: var(--qa-danger);
+  --amber: var(--qa-warning);
+}
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+button, input, textarea, select { font: inherit; }
+button, a, input, textarea, select, summary { -webkit-tap-highlight-color: transparent; }
+:where(button, a, input, textarea, select, summary):focus-visible { outline: 3px solid var(--qa-focus); outline-offset: 3px; }
+button, summary { cursor: pointer; }
+button:disabled { cursor: progress; }
+input, textarea, select { min-width: 0; }
+input::placeholder, textarea::placeholder { color: #647983; opacity: 1; }
+button, a, summary { touch-action: manipulation; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+}

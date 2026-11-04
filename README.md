@@ -4,6 +4,12 @@
 
 A local-first job search workspace for individual candidates. It combines public job feeds, job filtering, local matching, an application board, and application tracking in one static site.
 
+## v0.18.0 插件与网站同步
+
+在线工作台：https://lunarsh4de.github.io/autumn-job-workbench/ 。插件更新后，在同一浏览器中打开网站并点击「连接插件」。岗位、阶段、备注和日程双向同步；网站关闭期间插件继续记录，下次打开补齐。失败时本机保留待同步修改。支持完整 JSON 备份恢复、并行字段合并与删除保护。同步范围是同一浏览器配置文件，简历附件及个人资料不经岗位同步桥传输。
+
+发布包见 [Releases](https://github.com/lunarsh4de/autumn-job-workbench/releases)。用户场景、参考项目和验证范围见 [同步设计说明](resume-quick-apply/SYNC_DESIGN.md)。
+
 ## 功能 Features
 
 - 省份 → 城市两级岗位筛选，以及公司关键字筛选。

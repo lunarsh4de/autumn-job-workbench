@@ -590,6 +590,7 @@
     document.querySelector('#reset-catalog-filters').addEventListener('click', resetFilters);
     document.querySelector('#catalog-more').addEventListener('click', () => { state.visible += 200; renderTable(); });
     document.querySelector('#global-search').addEventListener('input', event => {
+      if (document.querySelector('#view-catalog').hidden) return;
       state.query = event.target.value.trim();
       document.querySelector('#catalog-search').value = state.query;
       state.visible = 200;

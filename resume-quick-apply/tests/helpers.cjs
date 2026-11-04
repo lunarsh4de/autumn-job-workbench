@@ -30,6 +30,15 @@ function setup(t, html, state = {}, url = 'https://jobs.example.test/apply') {
     runtime: { getURL(path) { return `chrome-extension://test/${path}`; }, onMessage: { addListener(fn) { listener = fn; listenerCount++; } } },
     tabs: { async query() { return [{ id: 1, url: 'https://jobs.example.test/apply' }]; } }
   };
+  w.chrome.runtime.sendMessage = async message => {
+    if (message.type === 'clearApplications') {
+      await w.chrome.storage.local.set({ applications: [] });
+      return { applications: [] };
+    }
+    const result = require('../data.js').mergeApplication(data.applications, { ...message.application, createdAt: Date.now(), updatedAt: Date.now() });
+    await w.chrome.storage.local.set({ applications: result.applications });
+    return result;
+  };
   // jsdom lacks these platform features. Tests simulate them; not a browser load test.
   w.CSS = { escape: value => value.replace(/[^a-zA-Z0-9_-]/g, c => '\\' + c) };
   Object.defineProperty(w.HTMLElement.prototype, 'isContentEditable', { get() { return this.getAttribute('contenteditable') === 'true'; } });

@@ -105,16 +105,50 @@
       } catch { return null; }
       const text = (input, max) => typeof input === 'string' ? input.trim().slice(0, max) : '';
       return {
-        url: item.url,
+        url: applicationUrl(item.url),
         title: text(item.title, 240),
         company: text(item.company, 160),
-        status: item.status === 'submitted' ? 'submitted' : 'recorded',
+        status: ['submitted', 'communicated'].includes(item.status) ? item.status : 'recorded',
+        workflowStage: ['watch', 'preparing', 'communicating', 'applied', 'assessment', 'interview', 'offer', 'closed'].includes(item.workflowStage) ? item.workflowStage : '',
+        location: text(item.location, 120),
+        salary: text(item.salary, 120),
+        notes: text(item.notes, 10000),
         source: item.source === 'auto' ? 'auto' : 'manual',
         resumeProfileId: text(item.resumeProfileId, 80),
         resumeProfileLabel: text(item.resumeProfileLabel, 80),
-        createdAt: item.createdAt
+        createdAt: item.createdAt,
+        updatedAt: Number.isFinite(item.updatedAt) ? item.updatedAt : item.createdAt
       };
     }).filter(Boolean);
+  }
+  function applicationUrl(value) {
+    try {
+      const url = new URL(value);
+      if (!['https:', 'http:'].includes(url.protocol)) return '';
+      if (/(^|\.)zhipin\.com$/i.test(url.hostname) && url.pathname.startsWith('/job_detail/')) url.hash = '';
+      for (const key of [...url.searchParams.keys()]) {
+        if (/^(utm_.+|from|source|ref|referrer|spm|ka|lid|securityId)$/i.test(key)) url.searchParams.delete(key);
+      }
+      return url.href;
+    } catch { return ''; }
+  }
+  function mergeApplication(existing, candidate) {
+    const entry = applications([candidate])[0];
+    if (!entry || !entry.title || !entry.company) throw new Error('请填写有效的岗位、公司和网页链接。');
+    const list = applications(existing);
+    const index = list.findIndex(item => item.url === entry.url);
+    if (index < 0) return { applications: [entry, ...list].slice(0, 500), added: true };
+    const previous = list[index];
+    const rank = { recorded: 0, communicated: 1, submitted: 2 };
+    const status = rank[entry.status] > rank[previous.status] ? entry.status : previous.status;
+    // Repeated automatic signals must not replace user corrections or the original resume attribution.
+    const merged = entry.source === 'auto' ? { ...entry, ...previous, status } : { ...previous, ...entry, status };
+    merged.createdAt = previous.createdAt;
+    merged.updatedAt = Math.max(previous.updatedAt, entry.updatedAt);
+    merged.resumeProfileId = previous.resumeProfileId || entry.resumeProfileId;
+    merged.resumeProfileLabel = previous.resumeProfileLabel || entry.resumeProfileLabel;
+    list.splice(index, 1);
+    return { applications: [merged, ...list], added: false };
   }
   function backup(value) {
     if (!record(value) || !Object.hasOwn(value, 'profile')) throw new Error('不是有效的资料备份，缺少 profile 字段。');
@@ -135,7 +169,7 @@
       return result;
     };
   }
-  const api = { fields, experienceSchemas, maxResumeBytes, maxImportBytes, maxResumeImportBytes, maxResumeProfiles, profile, resume, settings, experiences, resumeProfile, resumeProfiles, applications, backup, createQueue };
+  const api = { fields, experienceSchemas, maxResumeBytes, maxImportBytes, maxResumeImportBytes, maxResumeProfiles, profile, resume, settings, experiences, resumeProfile, resumeProfiles, applications, applicationUrl, mergeApplication, backup, createQueue };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else globalThis.ResumeData = api;
 })();

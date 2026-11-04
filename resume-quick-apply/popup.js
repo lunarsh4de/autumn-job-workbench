@@ -14,13 +14,17 @@ let importRequest = 0;
 let currentResume = null;
 let resumeProfiles = [];
 let activeProfileId = '';
+let applicationHistory = [];
+let historyVisible = 30;
+let currentJobUrl = '';
+let pageSupported = true;
 
-const manifestVersion = globalThis.chrome?.runtime?.getManifest?.().version || '0.15.0';
+const manifestVersion = globalThis.chrome?.runtime?.getManifest?.().version || '0.18.0';
 const versionBadge = document.querySelector('#version-badge');
 if (versionBadge) versionBadge.textContent = `v${manifestVersion}`;
 
 document.querySelector('#open-dashboard').addEventListener('click', () => {
-  chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html') });
+  chrome.tabs.create({ url: 'https://lunarsh4de.github.io/autumn-job-workbench/' });
   window.close();
 });
 
@@ -62,9 +66,11 @@ const experienceMeta = {
 function clearPreview() { document.querySelector('#preview').hidden = true; }
 
 function flash(text, error = false) {
+  window.clearTimeout(flash.timer);
   message.textContent = text;
   message.dataset.error = String(error);
   message.hidden = !text;
+  if (text && !error) flash.timer = window.setTimeout(() => { message.hidden = true; }, 6000);
 }
 function updateCompleteness() {
   const completed = ResumeData.fields.filter(key => form.elements.namedItem(key).value.trim()).length;
@@ -73,6 +79,9 @@ function updateCompleteness() {
   document.querySelector('#profile-score').textContent = `${percentage}%`;
   document.querySelector('#profile-progress').style.width = `${percentage}%`;
   document.querySelector('#setup-hint').hidden = completed >= 3;
+  const prepared = completed > 0 || currentResume || Object.values(currentExperiences).some(items => items.length);
+  document.querySelector('.quick-intake').hidden = Boolean(prepared);
+  document.querySelector('#active-resume-strip').hidden = !prepared;
 }
 function profileFromForm() {
   return ResumeData.profile(Object.fromEntries(ResumeData.fields.map(key => [key, form.elements.namedItem(key).value])));
@@ -90,6 +99,7 @@ function showResume(resume) {
   document.querySelector('#quick-import-status').textContent = resume?.name
     ? `已保存：${resume.name}`
     : '本地解析 PDF、DOCX 或 TXT，确认后再保存';
+  updateCompleteness();
 }
 function putSettings(value) {
   quickAttachment.checked = ResumeData.settings(value).quickAttachment;
@@ -131,6 +141,7 @@ function renderResumeProfiles() {
   }
   const status = document.querySelector('#resume-profile-status');
   if (status) status.textContent = `${resumeProfiles.length} 份档案`;
+  document.querySelector('#quick-profile-label').textContent = activeResumeProfile()?.label || '默认简历';
 }
 function variantPayload(variant) {
   return {
@@ -178,7 +189,9 @@ async function activateResumeProfile(id) {
   document.querySelector('#resume-profile-status').textContent = `当前：${profile.label}`;
 }
 function lock(locked) {
-  document.querySelectorAll('input, textarea, button').forEach(element => { element.disabled = locked || !loaded; });
+  document.querySelector('.app-shell').setAttribute('aria-busy', String(locked || !loaded));
+  document.querySelectorAll('input, textarea, select, button').forEach(element => { element.disabled = locked || !loaded; });
+  if (!locked && loaded && !pageSupported) for (const id of ['fill-button', 'preview-button', 'undo-button', 'capture-job', 'import-page-profile']) document.getElementById(id).disabled = true;
   if (!locked && !loaded) {
     document.querySelector('#import-button').disabled = false;
     document.querySelector('#import-file').disabled = false;
@@ -201,6 +214,7 @@ function createExperienceInput(type, index, key, value) {
 }
 
 function renderExperiences() {
+  updateCompleteness();
   const root = document.querySelector('#experience-sections');
   root.replaceChildren();
   for (const [type, meta] of Object.entries(experienceMeta)) {
@@ -387,6 +401,88 @@ document.querySelector('#experience-sections').addEventListener('click', event =
   });
 });
 
+function renderImportDetails(candidate) {
+  const labels = { name: '姓名', phone: '手机号', email: '邮箱', city: '城市', education: '学历', school: '学校', skills: '技能', website: '个人主页', summary: '自我介绍' };
+  const lines = Object.entries(candidate.profile).filter(([, value]) => value).map(([key, value]) => `${labels[key]}：${value}`);
+  for (const [type, items] of Object.entries(candidate.experiences)) {
+    if (items.length) lines.push(`\n${experienceMeta[type].title}`, ...items.map((item, index) => `${index + 1}. ${Object.values(item).filter(Boolean).join(' · ')}`));
+  }
+  document.querySelector('#resume-import-details').textContent = lines.join('\n');
+}
+document.querySelector('#import-page-profile').addEventListener('click', () => {
+  const request = ++importRequest;
+  importCandidate = null;
+  document.querySelector('#resume-import-preview').hidden = true;
+  action(async () => {
+    const result = await sendToPage('readPageProfile');
+    if (request !== importRequest) return;
+    const profile = ResumeData.profile(result.profile);
+    const experiences = ResumeData.experiences(result.experiences);
+    if (result.resumeText) {
+      const parsed = ResumeParser.parseResumeText(result.resumeText);
+      for (const type of Object.keys(experiences)) experiences[type] = appendUnique(experiences[type], parsed.experiences[type]);
+    }
+    const count = Object.values(profile).filter(Boolean).length + Object.values(experiences).reduce((sum, list) => sum + list.length, 0);
+    if (!count) throw new Error('没有识别到已填写资料。请打开 BOSS 在线简历，展开栏目或编辑表单后重试。');
+    importCandidate = { profile, experiences: ResumeData.experiences(experiences), attachment: null, fileName: result.source || '网页资料' };
+    renderImportDetails(importCandidate);
+    document.querySelector('#resume-import-summary').textContent = `来源：${result.source}。${(result.warnings || []).join(' ')} 默认保留现有资料，可选择新建档案。`;
+    document.querySelector('#resume-import-replace').checked = false;
+    document.querySelector('#resume-import-new-profile').checked = false;
+    document.querySelector('#resume-import-profile-name-row').hidden = true;
+    document.querySelector('#resume-import-profile-name').value = '';
+    document.querySelector('#resume-import-attachment-row').hidden = true;
+    document.querySelector('#resume-import-save-attachment').checked = false;
+    document.querySelector('#resume-import-preview').hidden = false;
+    selectTab('experiences');
+    flash('网页资料已读取，请核对明细后应用。');
+  });
+});
+
+async function openJobCapture(job) {
+  const saved = await enqueue(() => chrome.storage.local.get(['applications', 'jobCaptureDraft']));
+  const key = ResumeData.applicationUrl(job.url);
+  const existing = validApplications(saved.applications).find(item => ResumeData.applicationUrl(item.url) === key);
+  const draft = saved.jobCaptureDraft;
+  const restore = draft && ResumeData.applicationUrl(draft.url) === key && draft.savedAt > (existing?.updatedAt || existing?.createdAt || 0);
+  const values = restore ? draft : existing || job;
+  for (const field of ['title', 'company', 'url', 'location', 'salary', 'notes']) document.querySelector(`#capture-${field}`).value = typeof values[field] === 'string' ? values[field] : '';
+  document.querySelector('#capture-status').value = ['submitted', 'communicated'].includes(values.status) ? values.status : 'recorded';
+  document.querySelector('#capture-heading').textContent = existing ? '更新已有记录' : '核对岗位信息';
+  document.querySelector('#job-capture-hint').textContent = `${restore ? '已恢复尚未保存的草稿。' : ''}${existing ? `此岗位已${applicationStatus(existing).slice(1)}，保存将更新原记录。` : '请核对公司和独立岗位链接。'}填写过程会自动保留本机草稿。`;
+  document.querySelector('#job-capture-form').hidden = false;
+  selectTab('quick');
+  document.querySelector('#job-capture-form').scrollIntoView?.({ block: 'start' });
+}
+document.querySelector('#capture-job').addEventListener('click', () => action(async () => { await openJobCapture(await sendToPage('readPageJob')); }));
+function captureValues() {
+  return Object.fromEntries(['title', 'company', 'url', 'location', 'salary', 'notes', 'status'].map(key => [key, document.querySelector(`#capture-${key}`).value.trim()]));
+}
+document.querySelector('#job-capture-form').addEventListener('input', () => {
+  const jobCaptureDraft = { ...captureValues(), savedAt: Date.now() };
+  enqueue(() => chrome.storage.local.set({ jobCaptureDraft })).catch(error => flash(`草稿保存失败：${error.message}`, true));
+});
+document.querySelector('#cancel-captured-job').addEventListener('click', () => action(async () => {
+  await enqueue(() => chrome.storage.local.set({ jobCaptureDraft: null }));
+  document.querySelector('#job-capture-form').hidden = true;
+}));
+document.querySelector('#job-capture-form').addEventListener('submit', event => {
+  event.preventDefault();
+  action(async () => {
+    const application = captureValues();
+    if (!application.title || !application.company || !ResumeData.applicationUrl(application.url)) throw new Error('请填写岗位、公司和有效的 HTTP(S) 链接。');
+    if (/(^|\.)zhipin\.com$/i.test(new URL(application.url).hostname) && !/^\/job_detail\//.test(new URL(application.url).pathname)) throw new Error('请填写 BOSS 的独立岗位链接（含 /job_detail/），避免不同岗位合并到同一个沟通页。');
+    const result = await chrome.runtime.sendMessage({ type: 'saveApplication', application: { ...application, source: 'manual', resumeProfileId: activeProfileId, resumeProfileLabel: activeResumeProfile()?.label || '' } });
+    if (!result || result.error) throw new Error(result?.error || '保存失败，请重试。');
+    await enqueue(() => chrome.storage.local.set({ jobCaptureDraft: null }));
+    renderHistory(result.applications);
+    renderCompanies(result.applications);
+    document.querySelector('#job-capture-form').hidden = true;
+    selectTab('history');
+    flash(result.added ? '已保存岗位记录，工作台会同步显示。' : '已更新已有岗位记录。');
+  });
+});
+
 document.querySelector('#resume-import-button').addEventListener('click', () => document.querySelector('#resume-import-file').click());
 document.querySelector('#quick-import-button').addEventListener('click', () => document.querySelector('#resume-import-file').click());
 document.querySelector('#resume-import-file').addEventListener('change', event => {
@@ -405,6 +501,7 @@ document.querySelector('#resume-import-file').addEventListener('change', event =
       }
       if (request !== importRequest) return;
       importCandidate = { ...parsed, attachment, fileName: file.name };
+      renderImportDetails(importCandidate);
       const counts = parsed.experiences;
       document.querySelector('#resume-import-summary').textContent =
         `识别 ${parsed.meta.detectedFields} 项基础资料、${counts.work.length} 段工作、${counts.education.length} 段教育、${counts.projects.length} 段项目、${counts.competitions.length} 段赛事、${counts.awards.length} 条获奖、${counts.campus.length} 段校园经历及 ${counts.languages.length + counts.publications.length} 条其他经历。应用前请核对分类结果。`;
@@ -653,9 +750,10 @@ document.querySelector('#import-file').addEventListener('change', event => {
   });
 });
 document.querySelector('#clear-history').addEventListener('click', () => {
-  if (!window.confirm('确认清空全部投递记录？此操作无法撤销。')) return;
+  if (!window.confirm('确认清空全部投递记录及网站看板中的对应岗位？请先导出备份，此操作无法撤销。')) return;
   action(async () => {
-    await enqueue(() => chrome.storage.local.set({ applications: [] }));
+    const result = await chrome.runtime.sendMessage({ type: 'clearApplications' });
+    if (!result || result.error) throw new Error(result?.error || '清空失败，请重试。');
     renderHistory([]);
     renderCompanies([]);
     flash('投递记录已清空。');
@@ -663,7 +761,7 @@ document.querySelector('#clear-history').addEventListener('click', () => {
 });
 function validApplications(applications) {
   return (Array.isArray(applications) ? applications : []).filter(item =>
-    item && typeof item.url === 'string' && /^https?:\/\//i.test(item.url) && Number.isFinite(item.createdAt));
+    item && typeof item.url === 'string' && /^https?:\/\//i.test(item.url) && Number.isFinite(item.createdAt) && Number.isFinite(new Date(item.createdAt).getTime()));
 }
 function applicationCompany(application) {
   try {
@@ -679,6 +777,11 @@ function applicationCompany(application) {
 function applicationProfile(application) {
   return typeof application.resumeProfileLabel === 'string' && application.resumeProfileLabel.trim()
     ? application.resumeProfileLabel.trim() : '未标记档案';
+}
+function applicationStatus(application) {
+  const labels = { watch: '关注', preparing: '准备中', communicating: '已沟通', applied: '已投递', assessment: '笔试', interview: '面试', offer: 'Offer', closed: '已结束' };
+  if (labels[application.workflowStage]) return labels[application.workflowStage];
+  return application.status === 'submitted' ? '已投递' : application.status === 'communicated' ? '已沟通' : '已记录';
 }
 function companySummary(applications) {
   const groups = new Map();
@@ -703,14 +806,14 @@ document.querySelector('#export-history').addEventListener('click', () => action
   const state = await enqueue(() => chrome.storage.local.get(['applications']));
   const applications = validApplications(state.applications);
   if (!applications.length) throw new Error('还没有可导出的投递记录。');
-  const rows = [['投递时间', '岗位', '公司或站点', '使用简历档案', '状态', '记录方式', '链接'], ...applications.map(item => [
+  const rows = [['投递时间', '岗位', '公司或站点', '使用简历档案', '状态', '记录方式', '链接', '地点', '薪资', '备注'], ...applications.map(item => [
     new Date(item.createdAt).toLocaleString('zh-CN'),
     typeof item.title === 'string' ? item.title : '',
     typeof item.company === 'string' ? item.company : '',
     applicationProfile(item),
-    item.status === 'submitted' ? '已投递' : '已记录',
+    applicationStatus(item),
     item.source === 'auto' ? '自动确认' : '手动标记',
-    item.url
+    item.url, item.location || '', item.salary || '', item.notes || ''
   ])];
   const blob = new Blob(['\ufeff' + rows.map(row => row.map(csvCell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -741,11 +844,24 @@ document.querySelector('#export-companies').addEventListener('click', () => acti
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   flash(`已导出 ${companies.length} 家公司的投递汇总。`);
 }));
-function renderHistory(applications) {
+function renderCurrentRecord() {
+  const existing = applicationHistory.find(item => ResumeData.applicationUrl(item.url) === currentJobUrl);
+  const banner = document.querySelector('#current-job-record');
+  banner.hidden = !existing;
+  banner.textContent = existing ? `此岗位${applicationStatus(existing)} · ${applicationCompany(existing)} · ${new Date(existing.createdAt).toLocaleDateString('zh-CN')}，可更新记录或继续跟进。` : '';
+}
+function renderHistory(applications = applicationHistory) {
+  applicationHistory = validApplications(applications);
+  renderCurrentRecord();
   const list = document.querySelector('#application-list');
   list.replaceChildren();
-  const valid = validApplications(applications);
-  for (const application of valid.slice(0, 30)) {
+  const query = document.querySelector('#history-search').value.trim().toLowerCase();
+  const status = document.querySelector('#history-status').value;
+  const valid = applicationHistory.filter(item => (status === 'all' || item.status === status) &&
+    [item.title, applicationCompany(item), item.notes, item.location, applicationProfile(item)].join(' ').toLowerCase().includes(query));
+  document.querySelector('#history-result-count').textContent = `共 ${applicationHistory.length} 条 · 匹配 ${valid.length} 条 · 显示 ${Math.min(historyVisible, valid.length)} 条`;
+  document.querySelector('#history-more').hidden = valid.length <= historyVisible;
+  for (const application of valid.slice(0, historyVisible)) {
     const item = document.createElement('li');
     item.className = 'application-item';
     const copy = document.createElement('div');
@@ -760,21 +876,34 @@ function renderHistory(applications) {
     const detail = document.createElement('span');
     detail.className = 'application-detail';
     const company = applicationCompany(application);
-    detail.textContent = `${application.status === 'submitted' ? '已投递' : '已记录'} · ${company} · 简历：${applicationProfile(application)}`;
+    detail.textContent = `${company} · 简历：${applicationProfile(application)}`;
     copy.append(title, detail);
-    const date = document.createElement('span');
+    const extra = [application.location, application.salary, application.notes].filter(Boolean).join(' · ');
+    if (extra) { const note = document.createElement('span'); note.className = 'application-extra'; note.textContent = extra; copy.append(note); }
+    const date = document.createElement('div');
     date.className = 'application-meta';
-    date.textContent = new Date(application.createdAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    const badge = document.createElement('span'); badge.className = 'record-status'; badge.dataset.status = application.status; badge.textContent = applicationStatus(application);
+    const time = document.createElement('time'); time.dateTime = new Date(application.createdAt).toISOString();
+    time.textContent = new Date(application.createdAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'text-button'; edit.textContent = '编辑记录'; edit.setAttribute('aria-label', `编辑${applicationCompany(application)}的${application.title}`);
+    edit.addEventListener('click', () => action(() => openJobCapture(application)));
+    date.append(badge, time, edit);
     item.append(copy, date);
     list.append(item);
   }
   if (!list.children.length) {
     const item = document.createElement('li');
     item.className = 'empty-state';
-    item.textContent = '还没有投递记录';
+    item.textContent = applicationHistory.length ? '没有匹配的记录。试试其他关键词或重置筛选。' : '还没有投递记录。在岗位页点击“保存当前岗位”，从第一条开始。';
     list.append(item);
   }
 }
+document.querySelector('#history-search').addEventListener('input', () => { historyVisible = 30; renderHistory(); });
+document.querySelector('#history-status').addEventListener('change', () => { historyVisible = 30; renderHistory(); });
+document.querySelector('#reset-history-filters').addEventListener('click', () => {
+  document.querySelector('#history-search').value = ''; document.querySelector('#history-status').value = 'all'; historyVisible = 30; renderHistory();
+});
+document.querySelector('#history-more').addEventListener('click', () => { historyVisible += 30; renderHistory(); });
 function renderCompanies(applications) {
   const list = document.querySelector('#company-list');
   list.replaceChildren();
@@ -840,15 +969,22 @@ async function loadPageContext() {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     const url = new URL(tab?.url || '');
     const supported = ['http:', 'https:'].includes(url.protocol);
+    pageSupported = supported;
+    currentJobUrl = supported ? ResumeData.applicationUrl(url.href) : '';
+    renderCurrentRecord();
     title.textContent = tab?.title || (supported ? '招聘页面' : '浏览器页面');
     host.textContent = supported ? url.hostname : url.protocol.replace(':', '') || '未知页面';
     badge.textContent = supported ? '可检查' : '不可填充';
     badge.dataset.status = supported ? 'ready' : 'blocked';
+    if (!supported) flash('当前页面不能填表。请打开招聘网页；资料和记录仍可在这里管理。');
+    if (loaded) lock(false);
   } catch {
+    pageSupported = false;
     title.textContent = '无法读取当前页面';
     host.textContent = '';
     badge.textContent = '不可用';
     badge.dataset.status = 'blocked';
+    if (loaded) lock(false);
   }
 }
 lock(true);

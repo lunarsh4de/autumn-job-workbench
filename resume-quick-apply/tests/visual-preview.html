@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <base href="../" />
     <title>投简历助手 UI 预览</title>
-    <link rel="stylesheet" href="popup.css" />
-    <style>html,body{min-width:0;background:#e8edf0}body{display:grid;place-items:start center;padding:24px}.app-shell{box-shadow:0 14px 40px #1c2a3322}@media(max-width:380px){body{padding:0}}</style>
+    <link rel="stylesheet" href="popup.css?v=0.17.0" />
+    <style>html,body{min-width:0;width:100%;background:#edf2f5}body{display:grid;place-items:start center;padding:24px}.app-shell{width:480px;max-width:100%;box-shadow:0 12px 40px #1c2a3318;border-radius:12px}@media(max-width:520px){body{padding:0}.app-shell{border-radius:0;width:100%}}</style>
   </head>
   <body>
     <script>
       (async () => {
-        const html = await fetch('popup.html').then(response => response.text());
+        const html = await fetch('popup.html', { cache: 'no-store' }).then(response => response.text());
         const parsed = new DOMParser().parseFromString(html, 'text/html');
         for (const script of parsed.querySelectorAll('script')) script.remove();
         document.body.insertAdjacentHTML('afterbegin', parsed.body.innerHTML);
@@ -32,11 +32,32 @@
             { title: '商业分析师 - 云帆网络', url: 'https://jobs.example.test/2', createdAt: Date.now() - 86400000 }
           ]
         };
+        const scenario = new URLSearchParams(location.search);
+        if (scenario.has('empty')) { store.profile = {}; store.resume = null; store.experiences = {}; store.applications = []; }
+        if (scenario.has('long')) {
+          store.profile.name = '这是用于检验中文长文本换行的模拟姓名';
+          store.resume.name = '工业设计与硬件产品开发方向-作品集与简历-最终核对版-2027校招.pdf';
+          store.applications = Array.from({ length: 75 }, (_, index) => ({
+            title: `工业设计与硬件产品开发设计师（2027校园招聘-${index + 1}）`, company: '示例：星河智能硬件与工业设计科技有限公司',
+            url: `https://jobs.example.test/${index}`, createdAt: Date.now() - index * 86400000,
+            status: index % 3 === 0 ? 'submitted' : index % 3 === 1 ? 'communicated' : 'recorded',
+            notes: index === 70 ? '特殊旧记录检索：约定周五沟通作品集；https://example.test/verylongpathwithoutspaces123456789012345678901234567890' : '模拟备注：已核对岗位要求与作品集。',
+            salary: '15–25K · 14薪', location: '深圳 / 香港', resumeProfileLabel: '工业设计与硬件产品开发方向的定制简历档案'
+          }));
+        }
         window.chrome = {
+          runtime: { async sendMessage(request) {
+            if (request.type === 'clearApplications') { store.applications = []; return { applications: [] }; }
+            const result = ResumeData.mergeApplication(store.applications, { ...request.application, createdAt: Date.now() });
+            store.applications = result.applications;
+            return result;
+          } },
           storage: { local: { async get(keys) { return Object.fromEntries(keys.map(key => [key, store[key]])); }, async set(patch) { Object.assign(store, patch); } } },
           tabs: {
             async query() { return [{ id: 1, title: '高级数据产品经理｜星河科技', url: 'https://jobs.example.test/apply/4827' }]; },
             async sendMessage(id, request) {
+              if (request.type === 'readPageJob') return { title: '工业设计师', company: '星河科技', url: 'https://www.zhipin.com/job_detail/demo.html', location: '深圳', salary: '15-25K' };
+              if (request.type === 'readPageProfile') return { profile: store.profile, experiences: store.experiences, source: 'BOSS 在线简历（模拟）', warnings: ['这是本地界面验证样例。'] };
               if (request.type === 'previewResume') return {
                 items: [
                   { title: '姓名', label: '候选人姓名', value: '林晓', status: 'ready' },
@@ -51,7 +72,7 @@
         };
         for (const src of ['data.js', 'resume-parser.js', 'popup.js']) {
           await new Promise((resolve, reject) => {
-            const script = document.createElement('script'); script.src = src; script.onload = resolve; script.onerror = reject; document.body.append(script);
+            const script = document.createElement('script'); script.src = `${src}?preview=${Date.now()}`; script.onload = resolve; script.onerror = reject; document.body.append(script);
           });
         }
         const requestedTab = new URLSearchParams(location.search).get('tab');
