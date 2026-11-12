@@ -9,7 +9,7 @@ A local-first job search workspace for individual candidates. It combines public
 - 岗位类型优先，多选筛选遵循组内 OR / 组间 AND，显示上下文数量、已选标签和单组清除。
 - 先筛岗位再按公司折叠，默认收起；同公司展开每批 50 条，保留岗位列表视图。
 - 公开来源每日 08:00 / 14:00（北京时间）自动整理；失败来源保留上次成功快照并标陈旧，成功零岗位会清除该来源旧数据，全源失败不覆盖上版。网页打开期间每 30 分钟及恢复可见/联网时检查。
-- Supabase Auth GitHub + PKCE 账号接入与 RLS / 版本冲突保护已编写；**尚无真实 Supabase 项目，当前线上默认未启用登录与云保存**。配置步骤见 [supabase/README.md](supabase/README.md)。不向公共仓库保存个人资料或简历附件。
+- Supabase Auth GitHub + PKCE 账号接入与 RLS / 版本冲突保护已编写；**Supabase 项目与 GitHub provider 已配置，真实浏览器 OAuth 和云端持久化验收进行中**。配置步骤见 [supabase/README.md](supabase/README.md)。不向公共仓库保存个人资料或简历附件。
 - 账号与访客空间隔离，不自动吸收插件记录；可先在访客模式连接插件，再登录显式导入访客快照。账号内插件双向云同步未实现。
 
 交互参考与飞书取舍见 [docs/INTERACTION_OPTIONS.md](docs/INTERACTION_OPTIONS.md)。

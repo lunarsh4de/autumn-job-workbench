@@ -67,7 +67,7 @@ test('same-account second-tab write cannot silently overwrite local data; propos
 
 test('missing configuration exposes an honest local mode with no fake authentication',async t=>{
   const dom=new JSDOM(source('dashboard.html'),{url:'https://example.test/',runScripts:'outside-only'});t.after(()=>dom.window.close());const w=dom.window;
-  w.eval(source('dashboard-data.js'));w.eval(source('account-data.js'));w.eval(source('account.js'));await w.WorkbenchAccount.ready;
+  w.eval(source('dashboard-data.js'));w.eval(source('account-data.js'));w.eval(source('account-config.js'));w.eval(source('account.js'));await w.WorkbenchAccount.ready;
   assert.equal(w.WorkbenchAccount.user,null);assert.equal(w.document.querySelector('#account-login').disabled,true);assert.match(w.document.querySelector('#account-status').textContent,/尚未启用/);
 });
 
@@ -80,4 +80,16 @@ test('cloud pull does not overwrite edits made by another tab while the request 
   finish();await h.account.ready;
   assert.equal(JSON.parse(h.w.localStorage.getItem(AD.namespace(uidA,'accountBasic'))).name,'Edited while fetching');
   assert.match(h.w.document.querySelector('#account-status').textContent,/未覆盖本机/);
+});
+
+
+test('missing configuration script and missing SDK report different loading failures',async t=>{
+  for (const kind of ['config','sdk']) {
+    const dom=new JSDOM(source('dashboard.html'),{url:'https://example.test/',runScripts:'outside-only'});t.after(()=>dom.window.close());const w=dom.window;
+    w.eval(source('dashboard-data.js'));w.eval(source('account-data.js'));
+    if(kind==='sdk')w.WorkbenchAccountConfig={supabaseUrl:'https://fixture.supabase.co',publishableKey:'sb_publishable_fixture'};
+    w.eval(source('account.js'));await w.WorkbenchAccount.ready;
+    assert.match(w.document.querySelector('#account-status').textContent,kind==='config'?/配置脚本未能加载/:/登录组件未能加载/);
+    assert.equal(w.document.querySelector('#account-login').disabled,true);
+  }
 });

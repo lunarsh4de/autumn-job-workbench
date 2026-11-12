@@ -141,9 +141,15 @@
   async function init() {
     if (!node('account-login')) return;
     if (internal) { status('插件内继续使用本机资料与下方手动备份。账号云保存请打开网页版。'); node('account-login').disabled = true; return; }
-    if (!validConfig() || !globalThis.WorkbenchSupabase?.createClient) {
+    if (!globalThis.WorkbenchAccountConfig) {
+      status('账号配置脚本未能加载，请刷新页面并检查浏览器是否拦截站点脚本；本机数据保留。',true); node('account-login').disabled=true; profile(); return;
+    }
+    if (!validConfig()) {
       status('账号云保存尚未启用：站点维护者需配置 Supabase 与 GitHub 登录。你仍可浏览岗位、在本机保存资料和管理申请。'); node('account-login').disabled = true; profile();
       return;
+    }
+    if (!globalThis.WorkbenchSupabase?.createClient) {
+      status('账号登录组件未能加载，请刷新页面并检查浏览器是否拦截站点脚本；本机数据保留。',true); node('account-login').disabled=true; profile(); return;
     }
     const sessionStorage = {
       getItem:key=>localStorage.getItem(key), removeItem:key=>localStorage.removeItem(key),

@@ -222,4 +222,4 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install\Install-Resume
 
 网站采用岗位方向优先的多选筛选、公司折叠汇总和可切换岗位列表。公共feed按来源所有权刷新，失败来源保留成功快照并标陈旧；长期开着的页面会定时及联网恢复时重新检查。原有手动导入、外企中国大陆分类、简历本地分类、看板、日程、插件同步和手动Gist备份保留。
 
-账号接入选定 Supabase Auth GitHub PKCE 与 Postgres RLS。当前没有配置真实 Supabase 项目，所以登录按钮显示未启用；SQL、配置、部署步骤及账号数据白名单见根目录 `supabase/README.md`。账号空间独立于访客与插件，仅显式导入访客记录；附件不上传账号云端。旧Gist备份可能包含附件，仅扩展内手动使用；Secret Gist持链接者可访问。未改变插件对招聘网页的权限范围。
+账号接入选定 Supabase Auth GitHub PKCE 与 Postgres RLS。Supabase 项目与 GitHub provider 已配置，真实浏览器 OAuth 和云端持久化验收进行中；SQL、配置、部署步骤及账号数据白名单见根目录 `supabase/README.md`。账号空间独立于访客与插件，仅显式导入访客记录；附件不上传账号云端。旧Gist备份可能包含附件，仅扩展内手动使用；Secret Gist持链接者可访问。未改变插件对招聘网页的权限范围。

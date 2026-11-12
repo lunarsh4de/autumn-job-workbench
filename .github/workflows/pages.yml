@@ -35,7 +35,7 @@ jobs:
           python-version: '3.12'
       - name: Validate feed rules and client
         run: |
-          python -m unittest discover -s scripts -p test_refresh_jobs.py -v
+          python -m unittest discover -s scripts -p "test_*.py" -v
           npm ci --prefix resume-quick-apply
           npm test --prefix resume-quick-apply
       - name: Load last published public feed
@@ -134,42 +134,7 @@ jobs:
           cp resume-quick-apply/vendor/mammoth.browser.min.js resume-quick-apply/vendor/pdf.min.mjs resume-quick-apply/vendor/pdf.worker.min.mjs resume-quick-apply/vendor/supabase.min.js _site/vendor/
           cp resume-quick-apply/icons/*.svg _site/icons/
           cp resume-quick-apply/design-system.css resume-quick-apply/workbench-data.js resume-quick-apply/workbench-sync.js _site/
-          python - <<'PY'
-          import base64
-          import json
-          import os
-          import re
-          from pathlib import Path
-          from urllib.parse import urlsplit
-
-          url = os.environ.get("PUBLIC_SUPABASE_URL", "").strip()
-          key = os.environ.get("PUBLIC_SUPABASE_PUBLISHABLE_KEY", "").strip()
-          if bool(url) != bool(key):
-              raise SystemExit("Configure both public Supabase variables, or leave both empty.")
-          if url:
-              parsed = urlsplit(url)
-              if parsed.scheme != "https" or not parsed.hostname or not parsed.hostname.endswith(".supabase.co") or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in ("", "/") or parsed.port not in (None, 443):
-                  raise SystemExit("PUBLIC_SUPABASE_URL must be an HTTPS *.supabase.co project URL without credentials, query or path.")
-              if not key.startswith("sb_publishable_"):
-                  try:
-                      token = key.split(".")
-                      claims = json.loads(base64.urlsafe_b64decode(token[1] + "=" * (-len(token[1]) % 4)))
-                      is_anon = len(token) == 3 and claims.get("role") == "anon"
-                  except Exception:
-                      is_anon = False
-                  if not is_anon:
-                      raise SystemExit("Only a Supabase publishable/anon public key may be embedded in the site.")
-          config = {"supabaseUrl": url, "publishableKey": key, "redirectUrl": "https://lunarsh4de.github.io/autumn-job-workbench/"}
-          Path("_site/account-config.js").write_text("globalThis.WorkbenchAccountConfig = Object.freeze(" + json.dumps(config) + ");\n", encoding="utf-8")
-          html = Path("_site/index.html").read_text(encoding="utf-8")
-          for reference in re.findall(r'''(?:src|href)=["']([^"']+)["']''', html):
-              if reference.startswith(("http:", "https:", "#", "data:", "mailto:")):
-                  continue
-              asset = reference.split("?", 1)[0].split("#", 1)[0]
-              if asset and not (Path("_site") / asset).is_file():
-                  raise SystemExit(f"Missing static asset: {asset}")
-          print("Static assets verified; account configuration " + ("enabled." if url else "disabled (public variables absent)."))
-          PY
+          python scripts/prepare_site_config.py
           for script in _site/*.js; do node --check "$script"; done
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
