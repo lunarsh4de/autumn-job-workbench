@@ -7,6 +7,7 @@
     manualPreferences: { roles: '', skills: '', cities: '' },
     autoPreferences: { roles: '', skills: '', cities: '' },
     preferences: { roles: '', skills: '', cities: '' },
+    facets: { province: [], city: [], jobType: [], companyType: [], platform: [] }, layout: 'grouped', expanded: new Set(), groupVisible: 40,
     query: '', companyQuery: '', province: 'all', city: 'all', jobType: 'all', companyType: 'all', platform: 'all', score: 'all', sort: 'match', visible: 200
   };
   const employerGroups = [
@@ -45,6 +46,7 @@
   ];
   let resumeCandidate = null;
   let publicSyncing = false;
+  let lastPublicCheck = 0;
   let importing = false;
   let catalogReady = false;
   let pendingResumeSync = false;
@@ -133,27 +135,67 @@
     }
   }
 
-  function filteredItems() {
+  const facetDefinitions = [['province', '省份', '#catalog-province'], ['city', '城市', '#catalog-city'], ['jobType', '岗位类型', '#catalog-type'], ['companyType', '企业类型', '#catalog-company-type'], ['platform', '来源平台', '#catalog-platform']];
+  function matches(job, excluded) {
     const query = state.query.toLowerCase();
-    const list = state.items.filter(job => {
-      if (query && !`${job.company} ${job.title} ${job.location} ${job.province} ${job.city} ${job.platform} ${job.companyType} ${job.jobType} ${job.tags.join(' ')}`.toLowerCase().includes(query)) return false;
-      if (state.companyQuery && !CD.matchesCompany(job, state.companyQuery)) return false;
-      if (state.province !== 'all' && job.province !== state.province) return false;
-      if (state.city !== 'all' && job.city !== state.city) return false;
-      if (state.jobType !== 'all' && job.jobType !== state.jobType) return false;
-      if (state.companyType !== 'all' && job.companyType !== state.companyType) return false;
-      if (state.platform !== 'all' && job.platform !== state.platform) return false;
-      if (state.score === 'high' && !(job.matchScore >= 70)) return false;
-      if (state.score === 'medium' && !(job.matchScore >= 40 && job.matchScore < 70)) return false;
-      if (state.score === 'low' && !(Number.isFinite(job.matchScore) && job.matchScore < 40)) return false;
-      return true;
-    });
-    return list.sort((a, b) => state.sort === 'company'
+    if (query && !`${job.company} ${job.title} ${job.location} ${job.province} ${job.city} ${job.platform} ${job.companyType} ${job.jobType} ${job.tags.join(' ')}`.toLowerCase().includes(query)) return false;
+    if (state.companyQuery && !CD.matchesCompany(job, state.companyQuery)) return false;
+    for (const [key] of facetDefinitions) if (key !== excluded && state.facets[key].length && !state.facets[key].includes(job[key])) return false;
+    if (state.score === 'high' && !(job.matchScore >= 70)) return false;
+    if (state.score === 'medium' && !(job.matchScore >= 40 && job.matchScore < 70)) return false;
+    if (state.score === 'low' && !(Number.isFinite(job.matchScore) && job.matchScore < 40)) return false;
+    return true;
+  }
+  function filteredItems() {
+    return state.items.filter(job => matches(job)).sort((a, b) => state.sort === 'company'
       ? a.company.localeCompare(b.company, 'zh-CN')
       : state.sort === 'latest' ? b.importedAt - a.importedAt
         : (b.matchScore ?? -1) - (a.matchScore ?? -1) || b.importedAt - a.importedAt);
   }
-
+  function refreshFacets() {
+    const root = document.querySelector('#catalog-facets');
+    const open = new Set([...root.querySelectorAll('details[open]')].map(node => node.dataset.facet));
+    const focused = document.activeElement?.dataset;
+    const focusedKey = focused?.facetKey, focusedValue = focused?.facetValue;
+    const focusRole=focused?.roleType, focusChip=focused?.removeFacet, focusClear=focused?.clearFacet;
+    root.replaceChildren();
+    for (const [key, label] of facetDefinitions) {
+      const counts = new Map();
+      for (const job of state.items) if (matches(job, key) && job[key]) counts.set(job[key], (counts.get(job[key]) || 0) + 1);
+      const values = [...new Set([...counts.keys(), ...state.facets[key]])].sort((a, b) => a.localeCompare(b, 'zh-CN'));
+      const details = element('details', 'facet'); details.dataset.facet = key; details.open = open.has(key);
+      const summary = element('summary'); summary.append(element('span', '', label), element('strong', '', state.facets[key].length ? `已选 ${state.facets[key].length}` : '不限'));
+      const fieldset = element('fieldset', 'facet-options'); fieldset.append(element('legend', 'sr-only', label));
+      if (!values.length) fieldset.append(element('p', 'facet-empty', '当前条件下没有可选项'));
+      for (const value of values) {
+        const option = element('label', 'facet-option'); const input = document.createElement('input'); input.type = 'checkbox'; input.checked = state.facets[key].includes(value); input.dataset.facetKey = key; input.dataset.facetValue = value;
+        option.append(input, element('span', '', value), element('small', '', String(counts.get(value) || 0))); fieldset.append(option);
+      }
+      if (state.facets[key].length) { const clear = element('button', 'text-link', '清除此组'); clear.type = 'button'; clear.dataset.clearFacet = key; fieldset.append(clear); }
+      details.append(summary, fieldset); root.append(details);
+    }
+    if (focusedKey) [...root.querySelectorAll('input')].find(input => input.dataset.facetKey === focusedKey && input.dataset.facetValue === focusedValue)?.focus();
+    const tabs = document.querySelector('#catalog-role-tabs'); tabs.replaceChildren();
+    const counts = new Map(); for (const job of state.items) if (matches(job, 'jobType')) counts.set(job.jobType, (counts.get(job.jobType) || 0) + 1);
+    const all = element('button', 'role-tab', '全部方向'); all.type = 'button'; all.dataset.roleType = ''; all.setAttribute('aria-pressed', String(!state.facets.jobType.length)); tabs.append(all);
+    for (const type of [...new Set(state.items.map(job => job.jobType))].sort((a,b) => (counts.get(b)||0)-(counts.get(a)||0))) { const button = element('button', 'role-tab'); button.type = 'button'; button.dataset.roleType = type; button.setAttribute('aria-pressed', String(state.facets.jobType.includes(type))); button.append(element('span', '', type), element('small', '', String(counts.get(type)||0))); tabs.append(button); }
+    const chips = document.querySelector('#catalog-active-filters'); chips.replaceChildren();
+    for (const [key, label] of facetDefinitions) for (const value of state.facets[key]) { const chip = element('button', 'filter-chip', `${label}：${value} ×`); chip.type = 'button'; chip.dataset.removeFacet = key; chip.dataset.facetValue = value; chip.setAttribute('aria-label', `移除${label}：${value}`); chips.append(chip); }
+    for (const [key, label] of [['query','搜索'],['companyQuery','公司']]) if (state[key]) { const chip = element('button', 'filter-chip', `${label}：${state[key]} ×`); chip.type = 'button'; chip.dataset.clearQuery = key; chips.append(chip); }
+    if(focusRole !== undefined) [...tabs.querySelectorAll('button')].find(button=>button.dataset.roleType===focusRole)?.focus();
+    if(focusChip || focusClear) [...root.querySelectorAll('details')].find(details=>details.dataset.facet===(focusChip||focusClear))?.querySelector('summary')?.focus();
+  }
+  function toggleFacet(key, value, force) {
+    const selected = state.facets[key];
+    state.facets[key] = force === false || selected.includes(value) ? selected.filter(item => item !== value) : [...selected, value];
+    if (key === 'province' && state.facets.city.length) {
+      const valid = new Set(state.items.filter(job => !state.facets.province.length || state.facets.province.includes(job.province)).map(job => job.city));
+      const removed = state.facets.city.filter(city => !valid.has(city)); state.facets.city = state.facets.city.filter(city => valid.has(city));
+      if (removed.length) dashboard.flash(`已清除不属于所选省份的城市：${removed.join('、')}。`);
+    }
+    for (const [name,,selector] of facetDefinitions) { state[name] = state.facets[name].length === 1 ? state.facets[name][0] : 'all'; document.querySelector(selector).value = state[name]; }
+    state.visible = 200; state.groupVisible = 40; renderTable();
+  }
   function setOptions(selector, values, label) {
     const select = document.querySelector(selector);
     const current = select.value;
@@ -176,7 +218,7 @@
     const summary = CD.summary(state.items);
     document.querySelector('#nav-catalog-count').textContent = formatNumber(summary.total);
     document.querySelector('#catalog-total').textContent = formatNumber(summary.total);
-    document.querySelector('#catalog-companies').textContent = formatNumber(summary.companies);
+    document.querySelector('#catalog-companies').textContent = formatNumber(globalThis.CatalogView.groups(state.items).length);
     document.querySelector('#catalog-high-match').textContent = formatNumber(summary.highMatch);
     document.querySelector('#catalog-types').textContent = formatNumber(new Set(state.items.map(job => job.jobType)).size);
     state.province = setOptions('#catalog-province', state.items.map(job => job.province), '省份');
@@ -251,7 +293,7 @@
       row.append(cell);
       root.append(row);
     }
-    for (const job of list.slice(0, state.visible)) {
+    function jobRow(job) {
       const row = document.createElement('tr');
       const company = element('td', 'catalog-company-cell', job.company);
       if (job.companyType.startsWith('外企（')) company.append(element('span', 'company-type-badge', job.companyType));
@@ -268,6 +310,7 @@
       const location = element('td', '', job.location ? `${CD.formatRegion(job)}${job.location.includes(job.city) ? '' : ` · ${job.location}`}` : CD.formatRegion(job));
       const platform = document.createElement('td');
       platform.append(element('span', 'source-pill', job.platform));
+      if (job.stale) platform.append(element('small', 'stale-note', `来源缓存${job.lastSuccessfulAt ? ' · '+new Date(job.lastSuccessfulAt).toLocaleDateString('zh-CN') : ''}`));
       const actionsCell = document.createElement('td');
       const actions = element('div', 'catalog-row-actions');
       if (job.url) {
@@ -293,11 +336,36 @@
       actions.append(detail, track);
       actionsCell.append(actions);
       row.append(company, titleCell, scoreCell, location, platform, actionsCell);
-      root.append(row);
+      return row;
     }
+    for (const job of list.slice(0, state.visible)) root.append(jobRow(job));
+    renderGroups(list, jobRow);
+    refreshFacets();
     const more = document.querySelector('#catalog-more');
-    more.hidden = list.length <= state.visible;
-    more.textContent = `再显示 ${Math.min(200, list.length - state.visible)} 条`;
+    const groupCount = globalThis.CatalogView.groups(list).length;
+    more.hidden = state.layout === 'grouped' ? groupCount <= state.groupVisible : list.length <= state.visible;
+    more.textContent = state.layout === 'grouped' ? `再显示 ${Math.min(40, groupCount - state.groupVisible)} 家公司` : `再显示 ${Math.min(200, list.length - state.visible)} 条`;
+  }
+
+  function renderGroups(list, jobRow) {
+    const groups = globalThis.CatalogView.groups(list);
+    document.querySelector('#catalog-result-count').textContent = `${formatNumber(list.length)} 个岗位 / ${formatNumber(groups.length)} 家公司`;
+    const root = document.querySelector('#catalog-groups'); root.replaceChildren(); root.hidden = state.layout !== 'grouped';
+    document.querySelector('.catalog-table').hidden = state.layout === 'grouped';
+    document.querySelector('#catalog-group-hint').textContent = state.layout === 'grouped' ? '先比较岗位方向，再展开公司查看职位' : '每行一个岗位，可切回公司汇总';
+    document.querySelectorAll('[data-catalog-layout]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.catalogLayout === state.layout)));
+    if (!groups.length) { const empty = element('div','empty-state',state.items.length ? '没有符合这些条件的岗位。试试移除筛选条件。' : '岗位库尚未载入。可立即同步，或导入自己的清单。'); root.append(empty); }
+    for (const group of groups.slice(0, state.groupVisible)) {
+      const details = element('details', 'company-disclosure'); details.dataset.companyGroup = group.company;
+      const summary = element('summary'); const mark = element('span', 'company-monogram', group.company.slice(0,2)); const copy = element('span', 'company-group-copy');
+      copy.append(element('strong', '', group.company), element('span', '', [...group.types].join(' / ')));
+      const stats = element('span', 'company-group-stats'); stats.append(element('strong', '', `${group.jobs.length} 个岗位`), element('span', '', [...group.locations].slice(0,3).join('、') + (group.locations.size > 3 ? ` 等 ${group.locations.size} 地` : '')));
+      summary.append(mark, copy, stats, element('span','company-chevron','⌄')); details.append(summary);
+      let loaded = false; const body = element('div','company-jobs');
+      const fill = () => { if (loaded) return; loaded = true; const table = document.createElement('table'); const head = document.createElement('thead'); const row = document.createElement('tr'); for (const title of ['公司','岗位','匹配度','工作地点','来源','操作']) row.append(element('th','',title)); head.append(row); const tbody = document.createElement('tbody'); for (const job of group.jobs.slice(0,50)) tbody.append(jobRow(job)); table.append(head,tbody); body.append(table); if (group.jobs.length > 50) { const more = element('button','button secondary',`再显示本公司 ${Math.min(50,group.jobs.length-50)} 个岗位`); more.type='button'; let visible=50; more.addEventListener('click',()=>{ for(const job of group.jobs.slice(visible,visible+50)) tbody.append(jobRow(job)); visible+=50; more.hidden=visible>=group.jobs.length; more.textContent=`再显示本公司 ${Math.min(50,group.jobs.length-visible)} 个岗位`; }); body.append(more); } };
+      details.addEventListener('toggle', () => { if (details.open) {state.expanded.add(group.id); fill();} else state.expanded.delete(group.id); });
+      if (state.expanded.has(group.id)) { details.open=true; fill(); } details.append(body); root.append(details);
+    }
   }
 
   function openDetails(job) {
@@ -305,7 +373,7 @@
     document.querySelector('#catalog-detail-title').textContent = job.title;
     document.querySelector('#catalog-detail-company').textContent = `${job.company}${job.location ? ` · ${job.location}` : ''}`;
     document.querySelector('#catalog-detail-score').textContent = scoreLabel(job.matchScore);
-    document.querySelector('#catalog-detail-meta').textContent = [job.jobType, CD.formatRegion(job), job.platform, job.deadline ? `截止 ${job.deadline}` : ''].filter(Boolean).join(' · ');
+    document.querySelector('#catalog-detail-meta').textContent = [job.stale ? `来源缓存，最后成功：${job.lastSuccessfulAt || '时间未知'}` : '', job.jobType, CD.formatRegion(job), job.platform, job.deadline ? `截止 ${job.deadline}` : ''].filter(Boolean).join(' · ');
     document.querySelector('#catalog-detail-tags').textContent = job.tags.join(' · ') || '暂无标签';
     document.querySelector('#catalog-detail-description').textContent = job.description || '暂无岗位描述，请打开原始岗位页面查看。';
     const link = document.querySelector('#catalog-detail-link');
@@ -443,6 +511,7 @@
     return {
       enabled: enabled.length,
       ok: ok.length,
+      cached: enabled.filter(source=>source.status==='stale').map(source=>`${source.name || source.id}（最后成功 ${source.lastSuccessfulAt ? new Date(source.lastSuccessfulAt).toLocaleString('zh-CN') : '时间未知'}）`),
       failed: failed.map(source => source?.name || source?.id || '未知来源').slice(0, 5),
       errors: failed.map(source => {
         const name = source?.name || source?.id || '未知来源';
@@ -459,10 +528,12 @@
   function sourceHealthDetail(health) {
     if (!health?.failed?.length) return '';
     const failed = health.errors?.length ? health.errors : health.failed;
-    return `未成功来源：${failed.join('；')}。已保留当前浏览器中的岗位，可稍后重试。`;
+    return `${health.cached?.length ? `使用上次成功缓存：${health.cached.join('；')}。` : ''}未成功来源：${failed.join('；')}。已保留来源缓存或当前浏览器中的旧岗位，请在投递前核实。`;
   }
 
   async function syncPublicFeed(force = false) {
+    if (!force && lastPublicCheck && Date.now()-lastPublicCheck < 30*60*1000) return false;
+    lastPublicCheck = Date.now();
     if (publicSyncing) {
       if (force) dashboard.flash('公共源正在同步，请稍候。');
       return false;
@@ -484,18 +555,19 @@
       if (length > 25 * 1024 * 1024) throw new Error('公共岗位源超过 25 MB');
       const content = await response.text();
       if (content.length > 25 * 1024 * 1024) throw new Error('公共岗位源超过 25 MB');
-      const parsed = CD.rescore(CD.parseImport(content), state.preferences);
-      const merged = CD.replacePublic(state.items, parsed);
+      const document = JSON.parse(content);
+      const parsed = CD.rescore(document.jobs?.length === 0 ? [] : CD.parseImport(content), state.preferences);
+      const successfulSourceIds = (document?.meta?.sources || []).filter(source => source.status === 'ok').map(source => source.id);
+      const merged = CD.replacePublic(state.items, parsed, successfulSourceIds);
       if (merged.items.length > 50000) throw new Error('合并后岗位超过 50,000 条');
       await DB.replaceAll(merged.items);
       state.items = merged.items;
-      const document = JSON.parse(content);
       const generatedAt = document?.meta?.generatedAt || '';
       const health = sourceHealth(document?.meta?.sources);
       const sync = { at: Date.now(), total: parsed.length, generatedAt, sources: health };
       await dashboard.storage.set({ publicCatalogSync: sync });
       const healthLabel = sourceHealthLabel(health);
-      setPublicStatus(`公共源 ${parsed.length} 条${healthLabel ? ` · ${healthLabel}` : ''}，更新于 ${generatedAt ? new Date(generatedAt).toLocaleString('zh-CN') : '刚刚'}`, 'ready', sourceHealthDetail(health));
+      setPublicStatus(`公共源 ${parsed.length} 条${healthLabel ? ` · ${healthLabel}` : ''}，数据生成于 ${generatedAt ? new Date(generatedAt).toLocaleString('zh-CN') : '刚刚'} · 本机检查 ${new Date().toLocaleTimeString('zh-CN')}`, 'ready', sourceHealthDetail(health));
       render();
       if (force) dashboard.flash(`公共岗位已同步：新增 ${merged.added} 条，更新 ${merged.updated} 条。`);
       return true;
@@ -528,6 +600,9 @@
   function resetFilters() {
     state.query = '';
     state.companyQuery = '';
+    for (const [key] of facetDefinitions) state.facets[key] = [];
+    state.groupVisible = 40;
+    document.querySelector('#global-search').value = '';
     state.province = state.city = state.jobType = state.companyType = state.platform = state.score = 'all';
     state.sort = 'match';
     state.visible = 200;
@@ -537,8 +612,6 @@
     document.querySelector('#catalog-city').value = 'all';
     document.querySelector('#catalog-type').value = 'all';
     document.querySelector('#catalog-company-type').value = 'all';
-    document.querySelector('#catalog-region-summary').textContent = '不限';
-    document.querySelector('#catalog-job-summary').textContent = '不限';
     document.querySelector('#catalog-platform').value = 'all';
     document.querySelector('#catalog-score').value = 'all';
     document.querySelector('#catalog-sort').value = 'match';
@@ -582,13 +655,13 @@
     for (const [selector, key] of [['#catalog-province', 'province'], ['#catalog-city', 'city'], ['#catalog-type', 'jobType'], ['#catalog-company-type', 'companyType'], ['#catalog-platform', 'platform'], ['#catalog-score', 'score'], ['#catalog-sort', 'sort']]) {
       document.querySelector(selector).addEventListener('change', event => {
         state[key] = event.target.value;
-        if (key === 'province') state.city = 'all';
+        if (state.facets[key]) { state.facets[key] = event.target.value === 'all' ? [] : [event.target.value]; if (key === 'province') { state.city = 'all'; state.facets.city = []; } }
         state.visible = 200;
         render();
       });
     }
     document.querySelector('#reset-catalog-filters').addEventListener('click', resetFilters);
-    document.querySelector('#catalog-more').addEventListener('click', () => { state.visible += 200; renderTable(); });
+    document.querySelector('#catalog-more').addEventListener('click', () => { state.visible += 200; state.groupVisible += 40; renderTable(); });
     document.querySelector('#global-search').addEventListener('input', event => {
       if (document.querySelector('#view-catalog').hidden) return;
       state.query = event.target.value.trim();
@@ -600,7 +673,14 @@
       document.querySelector('#catalog-detail-dialog').close();
       scheduleDetailFocusRestore();
     });
+    document.body.addEventListener('change', event => { if (event.target.matches('[data-facet-key]')) toggleFacet(event.target.dataset.facetKey, event.target.dataset.facetValue); });
     document.body.addEventListener('click', event => {
+      const layout = event.target.closest('[data-catalog-layout]'); if (layout) { state.layout = layout.dataset.catalogLayout; renderTable(); return; }
+      const role = event.target.closest('[data-role-type]'); if (role) { if (!role.dataset.roleType) { state.facets.jobType = []; renderTable(); } else toggleFacet('jobType', role.dataset.roleType); return; }
+      const chip = event.target.closest('[data-remove-facet]'); if (chip) { toggleFacet(chip.dataset.removeFacet, chip.dataset.facetValue, false); return; }
+      const clear = event.target.closest('[data-clear-facet]'); if (clear) { state.facets[clear.dataset.clearFacet] = []; renderTable(); return; }
+      const query = event.target.closest('[data-clear-query]'); if (query) { state[query.dataset.clearQuery] = ''; document.querySelector(query.dataset.clearQuery === 'query' ? '#catalog-search' : '#catalog-company').value = ''; if (query.dataset.clearQuery === 'query') document.querySelector('#global-search').value=''; renderTable(); return; }
+
       const reset = event.target.closest('[data-reset-catalog]');
       if (reset) {
         resetFilters();
@@ -632,6 +712,7 @@
   }
 
   async function load() {
+    await globalThis.WorkbenchAccount?.ready;
     const saved = await dashboard.storage.get(['jobSearchPreferences', 'resumeAutoPreferences', 'resumeProfiles', 'activeProfileId', 'activeProfileLabel', 'profile', 'experiences']);
     state.manualPreferences = { ...state.manualPreferences, ...(saved.jobSearchPreferences || {}) };
     const storedAutomatic = saved.resumeAutoPreferences && Object.values(saved.resumeAutoPreferences).some(Boolean)
@@ -774,5 +855,8 @@
       dashboard.storage.get(resumeKeys).then(saved => syncResumeProfile(saved)).catch(error => dashboard.flash(`简历同步失败：${error.message}`, true));
     });
   }
-  window.addEventListener('resume-profile-updated', event => syncResumeProfile(event.detail || {}).catch(error => dashboard.flash(`简历同步失败：${error.message}`, true)));
+  window.addEventListener('online', () => catalogReady && syncPublicFeed(false));
+  document.addEventListener('visibilitychange', () => !document.hidden && catalogReady && syncPublicFeed(false));
+  setInterval(() => { if (!document.hidden && catalogReady) syncPublicFeed(false); }, 30*60*1000);
+  window.addEventListener('resume-profile-updated', event => !globalThis.WorkbenchAccount?.active && syncResumeProfile(event.detail || {}).catch(error => dashboard.flash(`简历同步失败：${error.message}`, true)));
 })();

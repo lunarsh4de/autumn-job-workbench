@@ -5,7 +5,7 @@
 
   function open() {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, 1);
+      const request = indexedDB.open(DB_NAME + (globalThis.WorkbenchAccount?.user ? `-user-${WorkbenchAccount.user.id}` : ''), 1);
       request.onupgradeneeded = () => {
         const store = request.result.createObjectStore(STORE, { keyPath: 'id' });
         store.createIndex('company', 'company');

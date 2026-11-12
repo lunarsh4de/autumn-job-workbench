@@ -1,4 +1,4 @@
-// Optional GitHub backup using the OAuth device flow and a private Gist.
+// Optional GitHub backup using the OAuth device flow and an unlisted Secret Gist.
 (() => {
   const CLIENT_ID = 'Ov23limvdukQdjiSNFkT';
   const GIST_DESCRIPTION = 'Autumn Job Workbench private backup';
@@ -22,6 +22,7 @@
   let authCancelled = false;
 
   function updateProfileUi(login = '') {
+    if (globalThis.WorkbenchAccount?.active) return;
     const label = document.querySelector('#profile-entry-label');
     const entryStatus = document.querySelector('#profile-entry-status');
     const centerName = document.querySelector('#profile-center-name');
@@ -52,7 +53,7 @@
   function backupStatus(login, gistId, backupAt) {
     if (!gistId) return `已连接 GitHub：${login}。个人备份仍需点击“保存到 GitHub”。`;
     const timestamp = Number(backupAt);
-    if (!Number.isFinite(timestamp) || timestamp <= 0) return `已连接 GitHub：${login}，已有私有备份可恢复。`;
+    if (!Number.isFinite(timestamp) || timestamp <= 0) return `已连接 GitHub：${login}，已有手动备份可恢复。`;
     const age = Date.now() - timestamp;
     const savedAt = new Date(timestamp).toLocaleString('zh-CN');
     if (age > 24 * 60 * 60 * 1000) return `已连接 GitHub：${login}，最近备份：${savedAt}。备份已超过 24 小时未更新。`;
@@ -178,7 +179,7 @@
     if (!token) throw new Error('请先登录 GitHub。');
     save.disabled = true;
     save.setAttribute('aria-busy', 'true');
-    setStatus('正在保存 GitHub 私有备份…', false, false, true);
+    setStatus('正在保存 GitHub 手动备份…', false, false, true);
     try {
       const snapshot = await storage.get(STORAGE_KEYS);
       const content = JSON.stringify({ schemaVersion: 1, savedAt: new Date().toISOString(), data: snapshot }, null, 2);
@@ -192,7 +193,7 @@
       }
       await storage.set({ githubGistId: gist.id, githubBackupAt: Date.now() });
       if (restore) { restore.hidden = false; restore.disabled = false; }
-      setStatus(`已保存到 GitHub 私有 Gist：${new Date().toLocaleString('zh-CN')}`);
+      setStatus(`已保存到 GitHub Secret Gist（持链接可访问）：${new Date().toLocaleString('zh-CN')}`);
     } catch (error) {
       if (/401|Bad credentials|authentication/i.test(error.message)) {
         token = '';
@@ -211,15 +212,15 @@
     token = '';
     await storage.set({ githubGistToken: null, githubGistRefreshToken: null, githubGistExpiresAt: null, githubUserLogin: null, githubGistId: null, githubBackupAt: null });
     setConnectedUi('');
-    setStatus('已退出 GitHub；本地数据未删除，当前设备与私有 Gist 的绑定已解除。');
+    setStatus('已退出 GitHub；本地数据未删除，当前设备与 Secret Gist 的绑定已解除。');
   }
 
   async function readBackupFile() {
     const stored = await storage.get(['githubGistId']);
-    if (!stored.githubGistId) throw new Error('尚未找到 GitHub 私有备份，请先保存一次。');
+    if (!stored.githubGistId) throw new Error('尚未找到 GitHub 手动备份，请先保存一次。');
     const gist = await github(`/gists/${encodeURIComponent(stored.githubGistId)}`);
     const file = gist.files?.[FILE_NAME];
-    if (!file) throw new Error('私有 Gist 中没有找到工作台备份文件。');
+    if (!file) throw new Error('Secret Gist（持链接可访问） 中没有找到工作台备份文件。');
     let content = file.content || '';
     if (file.truncated && file.raw_url) {
       const response = await fetch(file.raw_url, { headers: { Accept: 'application/json', Authorization: `Bearer ${token}` } });
@@ -235,7 +236,7 @@
     if (!globalThis.BackupSyncData?.prepare) throw new Error('恢复组件未加载，请刷新页面后重试。');
     restore.disabled = true;
     restore.setAttribute('aria-busy', 'true');
-    setStatus('正在读取 GitHub 私有备份…', false, false, true);
+    setStatus('正在读取 GitHub 手动备份…', false, false, true);
     try {
       const payload = await readBackupFile();
       const patch = BackupSyncData.prepare(payload);
@@ -267,7 +268,7 @@
   if (!extensionAvailable) {
     signIn.disabled = true;
     if (restore) restore.disabled = true;
-    setStatus('网页版仅保存在本机；GitHub 私有备份请从投简历助手工作台打开。', false, true);
+    setStatus('网页版仅保存在本机；GitHub 手动备份请从投简历助手工作台打开。', false, true);
   }
   storage.get(['githubGistToken', 'githubUserLogin', 'githubGistRefreshToken', 'githubGistExpiresAt', 'githubGistId', 'githubBackupAt']).then(async stored => {
     if (!stored.githubGistToken) return;

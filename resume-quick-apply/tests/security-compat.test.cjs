@@ -124,12 +124,12 @@ test('GitHub sync preserves refreshed token metadata and reports backup freshnes
   assert.match(sync, /备份已超过 24 小时未更新/);
   assert.match(sync, /最近备份：\$\{savedAt\}/);
   assert.match(sync, /status\.setAttribute\('aria-busy', String\(busy\)\)/);
-  assert.match(sync, /正在保存 GitHub 私有备份/);
-  assert.match(sync, /正在读取 GitHub 私有备份/);
+  assert.match(sync, /正在保存 GitHub 手动备份/);
+  assert.match(sync, /正在读取 GitHub 手动备份/);
   assert.match(sync, /等待 GitHub 授权确认/);
   assert.match(sync, /authCancelled = false/);
   assert.match(sync, /GitHub 授权已取消/);
-  assert.match(sync, /当前设备与私有 Gist 的绑定已解除/);
+  assert.match(sync, /当前设备与 Secret Gist.*绑定已解除/);
   assert.match(sync, /async function discoverBackupGist/);
   assert.match(sync, /gist\?\.description === GIST_DESCRIPTION && gist\.files\?\.\[FILE_NAME\]/);
   assert.match(sync, /github\('\/gists\?per_page=100'\)/);
@@ -222,7 +222,7 @@ test('catalog source health exposes partial failures in visible status markup', 
   const dashboard = source('dashboard.html');
   const css = source('dashboard.css');
   assert.match(catalog, /errors: failed\.map/);
-  assert.match(catalog, /已保留当前浏览器中的岗位/);
+  assert.match(catalog, /已保留来源缓存或当前浏览器中的旧岗位/);
   assert.match(catalog, /#public-sync-detail/);
   assert.match(dashboard, /id="public-sync-detail"/);
   assert.match(css, /\.public-sync-detail/);

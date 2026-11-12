@@ -3,18 +3,19 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>秋招工作台</title>
-    <link rel="stylesheet" href="dashboard.css?v=0.18.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https:; object-src 'none'; base-uri 'none'; form-action 'self'" />
+    <title>智能求职工作台</title>
+    <link rel="stylesheet" href="dashboard.css?v=20261112.1" />
   </head>
   <body>
     <div class="app-frame">
       <aside class="sidebar" id="sidebar">
         <div class="workspace-brand">
           <span class="workspace-mark"><img src="icons/briefcase-business.svg" alt="" /></span>
-          <div><strong>秋招工作台</strong><span>2027 届</span></div>
+          <div><strong>智能求职工作台</strong><span>机会与申请，一起推进</span></div>
         </div>
         <nav class="side-nav" aria-label="工作台导航">
-          <button class="nav-item active" type="button" data-view="catalog" aria-current="page"><img src="icons/database.svg" alt="" /><span>27届岗位库</span><b id="nav-catalog-count">0</b></button>
+          <button class="nav-item active" type="button" data-view="catalog" aria-current="page"><img src="icons/database.svg" alt="" /><span>发现岗位</span><b id="nav-catalog-count">0</b></button>
           <button class="nav-item" type="button" data-view="overview"><img src="icons/layout-dashboard.svg" alt="" /><span>管理总览</span></button>
           <button class="nav-item" type="button" data-view="attention"><img src="icons/clock-3.svg" alt="" /><span>待处理</span><b id="nav-attention-count">0</b></button>
           <button class="nav-item" type="button" data-view="board"><img src="icons/kanban.svg" alt="" /><span>申请看板</span><b id="nav-active-count">0</b></button>
@@ -37,7 +38,7 @@
         <header class="topbar">
           <div class="topbar-left">
             <button class="icon-button mobile-menu" id="mobile-menu" type="button" title="打开导航" aria-label="打开导航" aria-controls="sidebar" aria-expanded="false"><img src="icons/menu.svg" alt="" /></button>
-            <div><p class="eyebrow">求职工作台</p><h1 id="view-title">27届秋招岗位</h1></div>
+            <div><p class="eyebrow">求职工作台</p><h1 id="view-title">发现岗位</h1></div>
           </div>
           <div class="top-actions">
             <label class="global-search"><img src="icons/search.svg" alt="" /><input id="global-search" type="search" placeholder="搜索当前视图" aria-label="搜索当前视图" autocomplete="off" /></label>
@@ -47,21 +48,18 @@
         </header>
 
         <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-        <section class="workbench-connection" aria-label="插件同步">
+        <details class="workbench-connection"><summary>插件连接与本机备份 <span>按需连接，同步此浏览器的申请进度</span></summary>
           <div><strong>插件与网站同步</strong><p id="sync-status" role="status" aria-live="polite">正在检查连接…</p><small>同一浏览器内双向同步岗位、进度、备注和日程；简历附件与个人资料留在插件内。</small></div>
           <div class="connection-actions"><button class="button primary" id="connect-extension" type="button">连接插件 / 立即同步</button><button class="button secondary" id="disconnect-extension" type="button" hidden>断开</button><button class="button secondary" id="backup-workbench" type="button">完整备份</button><label class="button secondary" for="restore-workbench">恢复备份<input id="restore-workbench" type="file" accept=".json,application/json" hidden /></label></div>
-        </section>
+        </details>
 
-        <section class="view active" id="view-catalog" data-title="27届秋招岗位">
+        <section class="view active" id="view-catalog" data-title="发现岗位">
           <div class="catalog-heading">
             <div><h2>发现下一份机会</h2><p>筛选公开岗位，选中后加入申请看板。</p></div>
             <div class="catalog-actions"><button class="button secondary" type="button" id="rescore-catalog"><img src="icons/refresh-cw.svg" alt="" />重新评分</button><button class="button primary" type="button" id="open-import"><img src="icons/file-up.svg" alt="" />导入岗位</button></div>
           </div>
-          <div class="source-banner"><img src="icons/database.svg" alt="" /><p><strong>数据来源</strong> <span id="public-sync-status" role="status" aria-live="polite">正在检查公共岗位源...</span><small class="public-sync-detail" id="public-sync-detail" hidden></small>；岗位存入 IndexedDB，不会上传个人筛选和投递记录。<span class="resume-sync-status" id="resume-sync-status" role="status" aria-live="polite">尚未检测到插件简历</span></p><button class="text-link" id="sync-public-catalog" type="button">立即同步</button><button class="text-link" type="button" data-go-view="sources">查看来源</button></div>
-          <details class="employer-disclosure"><summary>按重点公司快速查看 <span>科技 · 汽车 · 新能源</span></summary><section class="featured-employers" aria-labelledby="featured-employers-title">
-            <div class="featured-employers-copy"><p class="eyebrow">重点公司</p><h3 id="featured-employers-title">重点大厂校招 / 实习</h3><span>一键查看已同步岗位，缺失时可直达官方招聘站。</span></div>
-            <div class="featured-employer-groups" id="featured-employer-groups"></div>
-          </section></details>
+          <div class="source-banner"><img src="icons/database.svg" alt="" /><p><strong>数据来源</strong> <span id="public-sync-status" role="status" aria-live="polite">正在检查公共岗位源...</span><small class="public-sync-detail" id="public-sync-detail" hidden></small><span class="resume-sync-status" id="resume-sync-status" role="status" aria-live="polite" hidden>尚未检测到插件简历</span></p><button class="text-link" id="sync-public-catalog" type="button">立即同步</button><button class="text-link" type="button" data-go-view="sources">查看来源</button></div>
+
           <div class="metric-grid catalog-metrics" aria-label="岗位库数据">
             <article class="metric-card"><div class="metric-label"><span>岗位总数</span><span class="metric-icon blue"><img src="icons/briefcase-business.svg" alt="" /></span></div><strong id="catalog-total">0</strong><small>当前浏览器本地岗位</small></article>
             <article class="metric-card"><div class="metric-label"><span>覆盖公司</span><span class="metric-icon violet"><img src="icons/building-2.svg" alt="" /></span></div><strong id="catalog-companies">0</strong><small>按标准化公司名统计</small></article>
@@ -71,20 +69,26 @@
           <section class="match-strip" id="match-strip" hidden><div><span>高匹配岗位</span><strong id="match-strip-count">0 个岗位</strong></div><div id="match-strip-items"></div></section>
           <section class="catalog-browser">
             <div class="catalog-filter-head"><div><p class="eyebrow">搜索与筛选</p><h3>全部岗位</h3></div><span id="catalog-result-count">0 个岗位</span></div>
+            <section class="role-explorer" aria-label="优先选择岗位方向"><p>先选岗位方向</p><div id="catalog-role-tabs" class="role-tabs"></div></section>
             <div class="catalog-filters">
-              <label class="catalog-search"><img src="icons/search.svg" alt="" /><input id="catalog-search" type="search" placeholder="搜索公司、岗位、地点或标签" /></label>
-              <label class="catalog-filter-input"><img src="icons/building-2.svg" alt="" /><input id="catalog-company" type="search" placeholder="筛选公司（输入关键字）" aria-label="筛选公司" /></label>
-              <details class="filter-fold" id="catalog-region-fold"><summary>工作地区 <span id="catalog-region-summary">不限</span></summary><div class="filter-fold-body"><label>省份<select id="catalog-province" aria-label="按省份筛选"><option value="all">全部省份</option></select></label><label>城市<select id="catalog-city" aria-label="按城市筛选"><option value="all">全部城市</option></select></label></div></details>
-              <details class="filter-fold" id="catalog-job-fold"><summary>岗位分类 <span id="catalog-job-summary">不限</span></summary><div class="filter-fold-body"><label>岗位类型<select id="catalog-type" aria-label="筛选岗位类型"><option value="all">全部岗位类型</option></select></label></div></details>
-              <select id="catalog-company-type" aria-label="筛选企业类型"><option value="all">全部企业类型</option></select>
-              <select id="catalog-platform" aria-label="筛选平台"><option value="all">全部平台</option></select>
-              <select id="catalog-score" aria-label="筛选匹配分"><option value="all">不限分数</option><option value="high">70 分以上</option><option value="medium">40–69 分</option><option value="low">低于 40 分</option></select>
-              <select id="catalog-sort" aria-label="岗位排序"><option value="match">匹配度优先</option><option value="latest">最近导入</option><option value="company">公司名称</option></select>
-              <button class="button ghost" id="reset-catalog-filters" type="button">重置</button>
+              <label class="filter-field search-field"><span>搜索岗位</span><input id="catalog-search" type="search" placeholder="岗位、技能或地点" aria-label="搜索岗位" /></label>
+              <label class="filter-field"><span>公司关键词</span><input id="catalog-company" type="search" placeholder="输入公司名称" aria-label="筛选公司" /></label>
+              <div id="catalog-facets" class="catalog-facets"></div>
+              <label class="filter-field"><span>匹配分数</span><select id="catalog-score"><option value="all">不限分数</option><option value="high">70 分以上</option><option value="medium">40–69 分</option><option value="low">低于 40 分</option></select></label>
+              <label class="filter-field"><span>排序方式</span><select id="catalog-sort"><option value="match">匹配度优先</option><option value="latest">最近导入</option><option value="company">公司名称</option></select></label>
+              <button class="button ghost filter-reset" id="reset-catalog-filters" type="button">重置全部</button>
+              <div hidden><select id="catalog-province"><option value="all">全部省份</option></select><select id="catalog-city"><option value="all">全部城市</option></select><select id="catalog-type"><option value="all">全部岗位类型</option></select><select id="catalog-company-type"><option value="all">全部企业类型</option></select><select id="catalog-platform"><option value="all">全部平台</option></select></div>
             </div>
+            <div id="catalog-active-filters" class="active-filters" aria-label="已选筛选条件"></div>
+            <div class="catalog-results-bar"><span id="catalog-group-hint">筛选岗位后，按公司归纳</span><div class="view-switch" aria-label="结果展示"><button type="button" data-catalog-layout="grouped" aria-pressed="true">按公司折叠</button><button type="button" data-catalog-layout="list" aria-pressed="false">岗位列表</button></div></div>
+            <div id="catalog-groups" class="catalog-groups"></div>
             <div class="table-wrap catalog-table"><table><thead><tr><th>公司</th><th>岗位</th><th>匹配度</th><th>工作地点</th><th>来源</th><th>操作</th></tr></thead><tbody id="catalog-table"></tbody></table></div>
             <button class="button secondary load-more" id="catalog-more" type="button" hidden>再显示 200 条</button>
           </section>
+          <details class="employer-disclosure"><summary>按重点公司快速查看 <span>科技 · 汽车 · 新能源</span></summary><section class="featured-employers" aria-labelledby="featured-employers-title">
+            <div class="featured-employers-copy"><p class="eyebrow">重点公司</p><h3 id="featured-employers-title">重点大厂校招 / 实习</h3><span>一键查看已同步岗位，缺失时可直达官方招聘站。</span></div>
+            <div class="featured-employer-groups" id="featured-employer-groups"></div>
+          </section></details>
         </section>
 
         <section class="view" id="view-overview" data-title="管理总览" hidden>
@@ -186,7 +190,8 @@
             <section class="panel profile-identity-panel"><div class="profile-identity"><span class="profile-avatar" id="profile-avatar">?</span><div><h3 id="profile-center-name">本地求职者</h3><p id="profile-center-status">资料保存在当前浏览器</p></div></div><div class="profile-stat-grid"><div><strong id="profile-job-count">0</strong><span>岗位记录</span></div><div><strong id="profile-active-count">0</strong><span>推进中</span></div><div><strong id="profile-resume-status">未同步</strong><span>简历状态</span></div></div></section>
             <section class="panel profile-data-panel"><div class="panel-head"><div><p class="eyebrow">LOCAL DATA</p><h3>本地数据</h3></div><span class="panel-meta">仅保存在本机</span></div><p>工作台会在浏览器本地保存岗位库、投递阶段、简历档案和匹配偏好。可从投递资料页面导出完整备份。</p><button class="button secondary" type="button" data-go-view="sources">管理简历和匹配偏好</button></section>
           </div>
-          <section class="panel github-backup-panel"><div class="panel-head"><div><p class="eyebrow">OPTIONAL CLOUD BACKUP</p><h3>用 GitHub 保存个人备份</h3></div><span class="panel-meta">私有 Gist</span></div><p class="github-backup-copy">登录自己的 GitHub 账号后，工作台会把资料、简历档案、投递记录和匹配偏好保存到你的私有 Gist。岗位公共源不会写入个人备份。</p><div class="github-backup-actions"><button class="button secondary" id="github-sign-in" type="button"><img src="icons/external-link.svg" alt="" />登录 GitHub</button><button class="button primary" id="github-save-backup" type="button" disabled><img src="icons/save.svg" alt="" />保存到 GitHub</button><button class="button secondary" id="github-restore-backup" type="button" hidden disabled><img src="icons/download.svg" alt="" />从 GitHub 恢复</button><button class="text-link" id="github-cancel" type="button" hidden>取消授权</button><button class="text-link" id="github-sign-out" type="button" hidden>退出</button></div><button class="button secondary" id="open-local-workbench" type="button">打开插件内的备份工作台</button><p class="github-backup-status" id="github-backup-status" aria-busy="false">尚未连接 GitHub。</p></section>
+          <section class="panel account-panel" aria-labelledby="account-title"><div class="panel-head"><div><h3 id="account-title">GitHub 账号与云保存</h3><p>登录后，基础资料、匹配偏好和申请进度跟随账号。简历附件保留在本机。</p></div><button class="button primary" id="account-login" type="button">使用 GitHub 登录</button></div><p id="account-status" class="account-status" role="status" aria-live="polite">正在检查账号服务…</p><div class="account-actions"><button class="button secondary" id="account-export" type="button">导出账号完整备份</button><button class="button secondary" id="account-save" type="button" hidden>保存到账号</button><button class="button secondary" id="account-pull" type="button" hidden>重新读取云端</button><button class="button secondary" id="account-import" type="button" hidden>导入此浏览器的访客记录</button><button class="text-link" id="account-logout" type="button" hidden>退出账号</button></div><form id="account-profile-form" class="form-grid"><label>姓名<input name="name" maxlength="160" autocomplete="name" /></label><label>学校<input name="school" maxlength="160" /></label><label>学历<input name="degree" maxlength="160" /></label><label>毕业时间<input name="graduation" maxlength="160" placeholder="例如 2027 年" /></label><label>目标职位<input name="targetRole" maxlength="500" placeholder="例如 工业设计、产品经理" /></label><label>邮箱<input name="email" type="email" maxlength="160" autocomplete="email" /></label><div class="wide"><button class="button primary" type="submit">保存基础资料</button><span class="form-note">未登录时仅保存在此浏览器。</span></div></form></section>
+          <section class="panel github-backup-panel"><div class="panel-head"><div><p class="eyebrow">OPTIONAL CLOUD BACKUP</p><h3>插件旧版手动备份</h3></div><span class="panel-meta">Secret Gist</span></div><p class="github-backup-copy">仅在插件工作台使用。手动备份可包含简历附件；Secret Gist 不公开列出，但获得链接的人可以访问，请谨慎分享。此功能独立于上方账号云保存。</p><div class="github-backup-actions"><button class="button secondary" id="github-sign-in" type="button"><img src="icons/external-link.svg" alt="" />登录 GitHub</button><button class="button primary" id="github-save-backup" type="button" disabled><img src="icons/save.svg" alt="" />保存到 GitHub</button><button class="button secondary" id="github-restore-backup" type="button" hidden disabled><img src="icons/download.svg" alt="" />从 GitHub 恢复</button><button class="text-link" id="github-cancel" type="button" hidden>取消授权</button><button class="text-link" id="github-sign-out" type="button" hidden>退出</button></div><button class="button secondary" id="open-local-workbench" type="button">打开插件内的备份工作台</button><p class="github-backup-status" id="github-backup-status" aria-busy="false">尚未连接 GitHub。</p></section>
         </section>
       </main>
     </div>
@@ -236,17 +241,22 @@
       </div>
     </dialog>
 
-    <script src="catalog-data.js?v=0.18.0"></script>
-    <script src="catalog-db.js?v=0.18.0"></script>
-    <script src="data.js?v=0.18.0"></script>
-    <script src="dashboard-data.js?v=0.18.0"></script>
-    <script src="workbench-data.js?v=0.18.0"></script>
-    <script src="workbench-sync.js?v=0.18.0"></script>
-    <script src="backup-sync-data.js?v=0.18.0"></script>
-    <script src="resume-parser.js?v=0.18.0"></script>
+    <script src="catalog-data.js?v=20261112.1"></script>
+    <script src="catalog-db.js?v=20261112.1"></script>
+    <script src="data.js?v=20261112.1"></script>
+    <script src="dashboard-data.js?v=20261112.1"></script>
+    <script src="workbench-data.js?v=20261112.1"></script>
+    <script src="workbench-sync.js?v=20261112.1"></script>
+    <script src="vendor/supabase.min.js"></script>
+    <script src="account-config.js"></script>
+    <script src="account-data.js"></script>
+    <script src="account.js"></script>
+    <script src="catalog-view.js"></script>
+    <script src="backup-sync-data.js?v=20261112.1"></script>
+    <script src="resume-parser.js?v=20261112.1"></script>
     <script src="vendor/mammoth.browser.min.js"></script>
-    <script src="dashboard.js?v=0.18.0"></script>
-    <script src="github-sync.js?v=0.18.0"></script>
-    <script src="catalog.js?v=0.18.0"></script>
+    <script src="dashboard.js?v=20261112.1"></script>
+    <script src="github-sync.js?v=20261112.1"></script>
+    <script src="catalog.js?v=20261112.1"></script>
   </body>
 </html>

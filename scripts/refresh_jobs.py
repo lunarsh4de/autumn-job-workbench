@@ -202,7 +202,7 @@ def normalize(job: dict[str, Any], source: dict[str, Any]) -> dict[str, Any] | N
 
 
 def adapt_jobhunter(payload: Any) -> list[dict[str, Any]]:
-    rows = payload.get("jobs", []) if isinstance(payload, dict) else []
+    rows = require_list(payload, "jobs", "Jobhunter")
     result = []
     for row in rows:
         if not isinstance(row, dict) or row.get("active") is False or row.get("expired") is True:
@@ -223,7 +223,7 @@ def adapt_jobhunter(payload: Any) -> list[dict[str, Any]]:
 
 
 def adapt_new_grad(payload: Any) -> list[dict[str, Any]]:
-    rows = payload.get("positions", []) if isinstance(payload, dict) else []
+    rows = require_list(payload, "positions", "New Grad Positions")
     result = []
     for row in rows:
         company = row.get("company") or {}
@@ -248,11 +248,18 @@ def adapt_standard(payload: Any) -> list[dict[str, Any]]:
         return [row for row in payload if isinstance(row, dict)]
     if isinstance(payload, dict) and isinstance(payload.get("jobs"), list):
         return [row for row in payload["jobs"] if isinstance(row, dict)]
-    return []
+    raise ValueError("Standard JSON response must be a list or contain a jobs list")
+
+
+def require_list(payload: Any, key: str, label: str) -> list[Any]:
+    """An explicit empty list is valid; a missing list is a schema failure."""
+    if not isinstance(payload, dict) or not isinstance(payload.get(key), list):
+        raise ValueError(f"{label} response has no {key} list")
+    return payload[key]
 
 
 def adapt_greenhouse(payload: Any, source: dict[str, Any]) -> list[dict[str, Any]]:
-    rows = payload.get("jobs", []) if isinstance(payload, dict) else []
+    rows = require_list(payload, "jobs", "Greenhouse")
     company = clean(source.get("company"), 160) or clean(source.get("name"), 160)
     result = []
     for row in rows:
@@ -299,9 +306,7 @@ def collect_tencent_campus(source: dict[str, Any], max_bytes: int) -> list[dict[
         }
         response = post_json(source["url"], request_body, max_bytes, source.get("headers"))
         data = response.get("data") if isinstance(response, dict) else None
-        batch = data.get("positionList", []) if isinstance(data, dict) else []
-        if not isinstance(batch, list):
-            raise ValueError("Tencent campus response has no positionList")
+        batch = require_list(data, "positionList", "Tencent campus")
         if total is None:
             total = int(data.get("count") or 0)
         for row in batch:
@@ -355,9 +360,7 @@ def collect_meituan_campus(source: dict[str, Any], max_bytes: int) -> list[dict[
         }
         response = post_json(source["url"], request_body, max_bytes, source.get("headers"))
         data = response.get("data") if isinstance(response, dict) else None
-        batch = data.get("list", []) if isinstance(data, dict) else []
-        if not isinstance(batch, list):
-            raise ValueError("Meituan campus response has no job list")
+        batch = require_list(data, "list", "Meituan campus")
         if total is None:
             page = data.get("page") or {}
             total = int(page.get("totalCount") or 0) if isinstance(page, dict) else 0
@@ -411,9 +414,7 @@ def collect_byd_campus(source: dict[str, Any], max_bytes: int) -> list[dict[str,
             "pageIndex": page_index,
         }
         response = post_json(source["url"], request_body, max_bytes, source.get("headers"))
-        batch = response.get("data", []) if isinstance(response, dict) else []
-        if not isinstance(batch, list):
-            raise ValueError("BYD campus response has no job list")
+        batch = require_list(response, "data", "BYD campus")
         if total is None:
             page = response.get("page") or {}
             total = int(page.get("totalCount") or 0) if isinstance(page, dict) else 0
@@ -456,9 +457,7 @@ def collect_moka_campus(source: dict[str, Any]) -> list[dict[str, Any]]:
     if result.returncode != 0:
         raise RuntimeError(f"Moka helper failed: {clean(result.stderr, 1000)}")
     payload = json.loads(result.stdout)
-    jobs = payload.get("jobs", []) if isinstance(payload, dict) else []
-    if not isinstance(jobs, list):
-        raise ValueError("Moka helper returned no jobs list")
+    jobs = require_list(payload, "jobs", "Moka helper")
     detail_base_url = clean(source.get("detail_base_url") or source.get("url"), 4000).split("#", 1)[0].rstrip("/")
     rows = []
     for row in jobs:
@@ -582,8 +581,28 @@ def collect(source: dict[str, Any]) -> list[dict[str, Any]]:
     return [item for row in rows if (item := normalize(row, source))]
 
 
-def build(config_path: Path, output_path: Path, allow_partial: bool) -> dict[str, Any]:
+def read_previous(path: Path | None) -> dict[str, Any]:
+    if path is None or not path.exists():
+        return {"meta": {}, "jobs": []}
+    document = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(document, dict) or not isinstance(document.get("jobs"), list):
+        raise ValueError("Previous feed must contain a jobs list")
+    if not isinstance(document.get("meta", {}), dict):
+        raise ValueError("Previous feed meta must be an object")
+    if any(not isinstance(job, dict) or not job.get("id") or not job.get("sourceId") for job in document["jobs"]):
+        raise ValueError("Previous feed contains jobs without stable id/sourceId")
+    return document
+
+
+def build(config_path: Path, output_path: Path, allow_partial: bool, previous_path: Path | None = None) -> dict[str, Any]:
     config = json.loads(config_path.read_text(encoding="utf-8"))
+    previous = read_previous(previous_path if previous_path is not None else output_path)
+    previous_meta = previous.get("meta", {})
+    previous_status = {item.get("id"): item for item in previous_meta.get("sources", []) if isinstance(item, dict)}
+    previous_jobs: dict[str, list[dict[str, Any]]] = {}
+    for job in previous["jobs"]:
+        previous_jobs.setdefault(job["sourceId"], []).append(job)
+    generated_at = datetime.now(timezone.utc).isoformat()
     all_jobs: dict[str, dict[str, Any]] = {}
     status = []
     for source in config.get("sources", []):
@@ -592,15 +611,24 @@ def build(config_path: Path, output_path: Path, allow_partial: bool) -> dict[str
             continue
         try:
             jobs = collect(source)
+            jobs = [{**job, "stale": False, "lastSuccessfulAt": generated_at} for job in jobs]
             for job in jobs:
                 # Sources are ordered by trust. Keep official career-site data
                 # when a later aggregation source contains the same URL.
                 all_jobs.setdefault(job["id"], job)
-            status.append({"id": source["id"], "name": source["name"], "status": "ok", "count": len(jobs), "attribution": source.get("attribution")})
+            status.append({"id": source["id"], "name": source["name"], "status": "ok", "count": len(jobs), "stale": False, "lastSuccessfulAt": generated_at, "attemptedAt": generated_at, "attribution": source.get("attribution")})
         except Exception as error:  # Network and source schema failures are reported per source.
-            status.append({"id": source.get("id"), "name": source.get("name"), "status": "error", "count": 0, "error": str(error)[:500]})
             if not allow_partial:
                 raise
+            old_status = previous_status.get(source.get("id"), {})
+            last_successful_at = old_status.get("lastSuccessfulAt") or (previous_meta.get("generatedAt") if old_status.get("status") == "ok" else None)
+            cached = previous_jobs.get(source.get("id"), [])
+            # A successful empty source is cacheable too; it must not be confused
+            # with a source which has never completed successfully.
+            has_previous = bool(cached) or bool(last_successful_at)
+            for job in cached:
+                all_jobs.setdefault(job["id"], {**job, "stale": True, "lastSuccessfulAt": job.get("lastSuccessfulAt") or last_successful_at})
+            status.append({"id": source.get("id"), "name": source.get("name"), "status": "stale" if has_previous else "error", "count": len(cached), "stale": has_previous, "lastSuccessfulAt": last_successful_at, "attemptedAt": generated_at, "attribution": source.get("attribution"), "error": str(error)[:500]})
     successful = [item for item in status if item["status"] == "ok"]
     if not successful:
         raise RuntimeError("no enabled source completed successfully")
@@ -608,14 +636,18 @@ def build(config_path: Path, output_path: Path, allow_partial: bool) -> dict[str
     document = {
         "meta": {
             "schemaVersion": 1,
-            "generatedAt": datetime.now(timezone.utc).isoformat(),
+            "generatedAt": generated_at,
             "total": len(jobs),
+            "partial": any(item["status"] in {"stale", "error"} for item in status),
             "sources": status,
         },
         "jobs": jobs,
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(document, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    # Preserve the previous artifact if serialization or writing fails.
+    temporary_path = output_path.with_name(output_path.name + ".tmp")
+    temporary_path.write_text(json.dumps(document, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    temporary_path.replace(output_path)
     return document
 
 
@@ -624,8 +656,9 @@ def main() -> int:
     parser.add_argument("--sources", type=Path, default=Path("job-sources/sources.json"))
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--allow-partial", action="store_true")
+    parser.add_argument("--previous", type=Path, help="Previous published feed; defaults to the existing output file")
     args = parser.parse_args()
-    document = build(args.sources, args.output, args.allow_partial)
+    document = build(args.sources, args.output, args.allow_partial, args.previous)
     print(json.dumps(document["meta"], ensure_ascii=False, indent=2))
     return 0
 

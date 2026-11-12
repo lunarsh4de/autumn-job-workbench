@@ -170,6 +170,8 @@
       publishedAt: text(row.publishedAt || value.publishedAt, 30),
       deadline: text(row.deadline || value.deadline, 30),
       sourceId: text(value.sourceId, 120),
+      stale: value.stale === true,
+      lastSuccessfulAt: text(value.lastSuccessfulAt, 40),
       sourceAttribution: webUrl(value.sourceAttribution),
       matchScore,
       importedAt: Number.isFinite(value.importedAt) ? value.importedAt : now,
@@ -243,13 +245,11 @@
     return { items: [...map.values()], added, updated };
   }
 
-  function replacePublic(existing, incoming) {
-    const publicPlatforms = new Set((incoming || []).map(value => text(value?.platform, 100)).filter(Boolean));
-    const publicSourceIds = new Set((incoming || []).map(value => text(value?.sourceId, 120)).filter(Boolean));
+  function replacePublic(existing, incoming, successfulSourceIds) {
+    const sourceIds = new Set(successfulSourceIds || (incoming || []).map(value => text(value?.sourceId, 120)).filter(Boolean));
     const retained = (existing || []).filter(value => {
       const normalized = item(value);
-      if (!normalized) return false;
-      return !publicPlatforms.has(normalized.platform) && !publicSourceIds.has(normalized.sourceId);
+      return normalized && (!normalized.sourceId || !sourceIds.has(normalized.sourceId));
     });
     return merge(retained, incoming);
   }

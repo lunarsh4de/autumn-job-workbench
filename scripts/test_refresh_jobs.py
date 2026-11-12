@@ -9,6 +9,106 @@ import refresh_jobs
 
 
 class RefreshJobsTests(unittest.TestCase):
+    def build_fixture(self, sources, responses, previous=None, allow_partial=True):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config_path, output_path = root / "sources.json", root / "jobs.json"
+            config_path.write_text(json.dumps({"sources": sources}), encoding="utf-8")
+            if previous is not None:
+                output_path.write_text(json.dumps(previous), encoding="utf-8")
+
+            def respond(url, _max_bytes):
+                response = responses[url]
+                if isinstance(response, Exception):
+                    raise response
+                return response
+
+            with patch.object(refresh_jobs, "get_json", side_effect=respond):
+                return refresh_jobs.build(config_path, output_path, allow_partial)
+
+    @staticmethod
+    def source(source_id):
+        return {"id": source_id, "name": source_id, "type": "standard-json", "url": f"https://example.com/{source_id}", "enabled": True}
+
+    def test_partial_failure_retains_only_failed_source_and_success_timestamp(self):
+        a, b = self.source("a"), self.source("b")
+        old = self.build_fixture([a, b], {a["url"]: [{"title": "Old A", "url": "https://example.com/job/a"}], b["url"]: [{"title": "Old B", "url": "https://example.com/job/b"}]})
+        result = self.build_fixture([a, b], {a["url"]: OSError("offline"), b["url"]: [{"title": "New B", "url": "https://example.com/job/new-b"}]}, old)
+        self.assertEqual({job["title"] for job in result["jobs"]}, {"Old A", "New B"})
+        retained = next(job for job in result["jobs"] if job["sourceId"] == "a")
+        self.assertTrue(retained["stale"])
+        self.assertEqual(retained["lastSuccessfulAt"], old["meta"]["sources"][0]["lastSuccessfulAt"])
+        self.assertEqual(result["meta"]["sources"][0]["status"], "stale")
+        self.assertTrue(result["meta"]["partial"])
+
+    def test_successful_empty_source_clears_its_previous_rows(self):
+        a, b = self.source("a"), self.source("b")
+        old = self.build_fixture([a, b], {a["url"]: [{"title": "Expired", "url": "https://example.com/old"}], b["url"]: []})
+        result = self.build_fixture([a, b], {a["url"]: [], b["url"]: OSError("offline")}, old)
+        self.assertEqual(result["jobs"], [])
+        self.assertEqual(result["meta"]["sources"][0]["status"], "ok")
+        self.assertEqual(result["meta"]["sources"][0]["count"], 0)
+        self.assertEqual(result["meta"]["sources"][1]["status"], "stale")
+
+    def test_all_failure_does_not_overwrite_previous_output(self):
+        source = self.source("a")
+        old = self.build_fixture([source], {source["url"]: [{"title": "Keep me"}]})
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config_path, output_path = root / "sources.json", root / "jobs.json"
+            config_path.write_text(json.dumps({"sources": [source]}), encoding="utf-8")
+            original = json.dumps(old).encode("utf-8")
+            output_path.write_bytes(original)
+            with patch.object(refresh_jobs, "collect", side_effect=OSError("offline")):
+                with self.assertRaisesRegex(RuntimeError, "no enabled source"):
+                    refresh_jobs.build(config_path, output_path, True)
+            self.assertEqual(output_path.read_bytes(), original)
+
+    def test_malformed_json_is_error_instead_of_successful_empty(self):
+        a, b = self.source("a"), self.source("b")
+        result = self.build_fixture([a, b], {a["url"]: {"error": "API changed"}, b["url"]: []})
+        self.assertEqual(result["meta"]["sources"][0]["status"], "error")
+        self.assertEqual(result["meta"]["sources"][1]["status"], "ok")
+
+    def test_repeated_failure_preserves_original_last_successful_at(self):
+        a, b = self.source("a"), self.source("b")
+        old = self.build_fixture([a, b], {a["url"]: [{"title": "A"}], b["url"]: []})
+        failed_once = self.build_fixture([a, b], {a["url"]: OSError("offline"), b["url"]: []}, old)
+        failed_twice = self.build_fixture([a, b], {a["url"]: OSError("offline"), b["url"]: []}, failed_once)
+        self.assertEqual(failed_twice["meta"]["sources"][0]["lastSuccessfulAt"], old["meta"]["sources"][0]["lastSuccessfulAt"])
+
+    def test_disabled_sources_are_not_retained_and_new_success_ends_stale_state(self):
+        a, b = self.source("a"), self.source("b")
+        old = self.build_fixture([a, b], {a["url"]: [{"title": "A"}], b["url"]: [{"title": "B"}]})
+        result = self.build_fixture([{**a, "enabled": False}, b], {b["url"]: [{"title": "New B"}]}, old)
+        self.assertEqual([job["title"] for job in result["jobs"]], ["New B"])
+        self.assertFalse(result["jobs"][0]["stale"])
+        self.assertEqual(result["meta"]["sources"][0]["status"], "disabled")
+
+    def test_explicit_previous_path_and_strict_failure_preserve_artifact(self):
+        source = self.source("a")
+        old = self.build_fixture([source], {source["url"]: [{"title": "A"}]})
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config_path, output_path, previous_path = root / "sources.json", root / "jobs.json", root / "previous.json"
+            config_path.write_text(json.dumps({"sources": [source]}), encoding="utf-8")
+            previous_path.write_text(json.dumps(old), encoding="utf-8")
+            output_path.write_text("original", encoding="utf-8")
+            with patch.object(refresh_jobs, "collect", side_effect=OSError("offline")):
+                with self.assertRaises(OSError):
+                    refresh_jobs.build(config_path, output_path, False, previous_path)
+            self.assertEqual(output_path.read_text(encoding="utf-8"), "original")
+
+    def test_official_adapter_missing_data_is_not_empty_success(self):
+        for adapter, args in [
+            (refresh_jobs.collect_tencent_campus, ({"url": "https://example.com"}, 1024)),
+            (refresh_jobs.collect_meituan_campus, ({"url": "https://example.com"}, 1024)),
+            (refresh_jobs.collect_byd_campus, ({"url": "https://example.com"}, 1024)),
+        ]:
+            with self.subTest(adapter=adapter.__name__), patch.object(refresh_jobs, "post_json", return_value={"code": 500}):
+                with self.assertRaises(ValueError):
+                    adapter(*args)
+
     def test_markdown_table_adapter_reads_chinese_headers_and_links(self):
         source = """
 | 公司 | 岗位 | 地点 | 投递链接 |

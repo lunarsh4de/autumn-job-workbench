@@ -14,7 +14,7 @@
     onItems(items) { state.items = items; renderAll(); },
     onStatus({ connected, message, pending, error }) {
       document.querySelector('#sync-status').textContent = message;
-      document.querySelector('#sync-status').dataset.error = String(error);
+      document.querySelector('#sync-status').dataset.error = String(error && connected);
       document.querySelector('#sync-label').textContent = connected ? '插件已连接' : '本机保存';
       document.querySelector('#sync-summary').textContent = pending ? `${pending} 项待同步` : connected ? '岗位与进度双向同步' : '连接后自动补同步';
       document.querySelector('#sync-dot').classList.toggle('connected', connected);
@@ -25,6 +25,7 @@
 
   function createStorage() {
     if (globalThis.chrome?.storage?.local) return chrome.storage.local;
+    if (globalThis.WorkbenchAccount) return WorkbenchAccount.storage;
     return {
       async get(keys) {
         return Object.fromEntries(keys.map(key => {
@@ -153,7 +154,7 @@
   }
 
   async function persist(message, options) {
-    if (sync) await sync.save(state.items, options);
+    if (sync && !globalThis.WorkbenchAccount?.active) await sync.save(state.items, options);
     else await storage.set({ jobTrackerItems: state.items });
     if (message) flash(message);
   }
@@ -669,7 +670,7 @@
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `秋招工作台-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `智能求职工作台-${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.append(link);
     link.click();
     link.remove();
@@ -766,7 +767,7 @@
       } else if (sync) sync.openProfile().catch(error => flash(error.message, true));
       else showView('sources');
     });
-    document.querySelector('#connect-extension')?.addEventListener('click', () => sync?.connect());
+    document.querySelector('#connect-extension')?.addEventListener('click', () => !globalThis.WorkbenchAccount?.active && sync?.connect());
     document.querySelector('#disconnect-extension')?.addEventListener('click', () => sync?.disconnect().catch(error => flash(error.message, true)));
     document.querySelector('#backup-workbench')?.addEventListener('click', () => {
       const blob = new Blob([JSON.stringify({ schema: 'resume-workbench', version: 1, exportedAt: Date.now(), items: state.items }, null, 2)], { type: 'application/json' });
@@ -822,9 +823,10 @@
   }
 
   async function load() {
+    await globalThis.WorkbenchAccount?.ready;
     const resumeSaved = await storage.get(['resumeProfiles', 'activeProfileId', 'activeProfileLabel', 'profile', 'experiences']);
     setResumeSyncStatus(resumeSaved);
-    if (sync) {
+    if (sync && !globalThis.WorkbenchAccount?.active) {
       await sync.start();
       setInterval(() => { renderAttention(); }, 60000);
       return;
