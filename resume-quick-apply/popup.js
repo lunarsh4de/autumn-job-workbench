@@ -19,7 +19,7 @@ let historyVisible = 30;
 let currentJobUrl = '';
 let pageSupported = true;
 
-const manifestVersion = globalThis.chrome?.runtime?.getManifest?.().version || '0.18.0';
+const manifestVersion = globalThis.chrome?.runtime?.getManifest?.().version || '0.19.0';
 const versionBadge = document.querySelector('#version-badge');
 if (versionBadge) versionBadge.textContent = `v${manifestVersion}`;
 

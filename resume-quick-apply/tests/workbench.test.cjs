@@ -16,7 +16,7 @@ function worker(initial = {}) {
   let handler;
   const event = { addListener() {} };
   const chrome = {
-    runtime: { id: 'test', getURL: path => `chrome-extension://test/${path}`, getManifest: () => ({ version: '0.18.0' }), onMessage: { addListener(fn) { handler = fn; } }, onInstalled: event, onStartup: event },
+    runtime: { id: 'test', getURL: path => `chrome-extension://test/${path}`, getManifest: () => ({ version: '0.19.0' }), onMessage: { addListener(fn) { handler = fn; } }, onInstalled: event, onStartup: event },
     storage: { onChanged: { addListener(fn) { listeners.push(fn); } }, local: {
       async get(keys) { return Object.fromEntries(keys.map(key => [key, structuredClone(state[key])])); },
       async set(patch) {
@@ -169,4 +169,43 @@ test('own extension dashboard and profile page work when opened as browser tabs'
   assert.equal((await h.send({ type: 'saveApplication', application: item() }, internal)).applications.length, 1);
   await h.send({ type: 'clearApplications' }, internal);
   assert.equal(h.state.applications.length, 0);
+});
+
+test('plugin sync snapshots retain catalog metadata in the dashboard and persist the enriched snapshot', async t => {
+  const {setup}=require('./helpers.cjs');
+  const raw=item({company:'自动同步科技',title:'自动岗位',source:'extension',recordMode:'auto',notes:'用户自己的备注',salary:'用户确认薪资'});
+  const h=setup(t,source('dashboard.html'),{jobTrackerItems:[raw]});
+  const w=h.w;w.scrollTo=()=>{};w.setInterval=()=>0;
+  w.eval(source('dashboard-data.js'));
+  w.CatalogDB={async getAll(){return [{url:raw.url,companyType:'外企（中国大陆）',jobType:'设计体验',platform:'官方招聘',notes:'公开岗位描述',salary:'来源薪资',profile:{name:'不可同步'},resume:{dataUrl:'不可同步'}}];}};
+  const saved=[];
+  w.WorkbenchSync={create(options){return {async start(){options.onItems([raw]);},async save(items){saved.push(structuredClone(items));options.onItems(items);}};}};
+  w.eval(source('dashboard.js'));
+  await until(()=>saved.length===1);
+  assert.equal(saved[0][0].companyType,'外企（中国大陆）');
+  assert.equal(saved[0][0].jobType,'设计体验');
+  assert.equal(saved[0][0].platform,'官方招聘');
+  assert.equal(saved[0][0].notes,'用户自己的备注');
+  assert.equal(saved[0][0].salary,'用户确认薪资');
+  assert.equal(saved[0][0].profile,undefined);
+  assert.equal(saved[0][0].resume,undefined);
+  assert.match(h.document.querySelector('#kanban').textContent,/设计体验/);
+  assert.match(h.document.querySelector('#kanban').textContent,/插件自动识别/);
+});
+
+test('late catalog enrichment cannot overwrite a newer plugin snapshot or its user edits',async t=>{
+  const {setup}=require('./helpers.cjs');const raw=item({notes:'旧备注'});
+  const h=setup(t,source('dashboard.html'),{jobTrackerItems:[raw]});const w=h.w;
+  w.scrollTo=()=>{};w.setInterval=()=>0;w.eval(source('dashboard-data.js'));
+  let finish;const wait=new Promise(resolve=>{finish=resolve;});let reads=0;
+  w.CatalogDB={async getAll(){reads++;await wait;return [{url:raw.url,jobType:'设计体验',notes:'来源旧备注'}];}};
+  let receive;const saved=[];
+  w.WorkbenchSync={create(options){receive=options.onItems;return {async start(){receive([raw]);},async save(items){saved.push(structuredClone(items));receive(items);}};}};
+  w.eval(source('dashboard.js'));await until(()=>reads===1);
+  receive([{...raw,notes:'新备注',stage:'interview',jobType:'用户已确认分类'}]);
+  finish();await until(()=>reads>=2);await new Promise(resolve=>setTimeout(resolve,5));
+  assert.equal(saved.length,0);
+  assert.equal(w.JobTrackerDashboard.getItems()[0].notes,'新备注');
+  assert.equal(w.JobTrackerDashboard.getItems()[0].stage,'interview');
+  assert.equal(w.JobTrackerDashboard.getItems()[0].jobType,'用户已确认分类');
 });

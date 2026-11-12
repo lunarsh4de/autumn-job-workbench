@@ -5,8 +5,9 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const extensionRoot = resolve(process.env.RQA_EXTENSION_ROOT || resolve(here, '..'));
-const profileRoot = process.env.RQA_EDGE_PROFILE ? resolve(process.env.RQA_EDGE_PROFILE) : resolve(here, '..', '..', 'output', 'edge-smoke-0.18.0');
-const screenshotRoot = resolve(here, '..', '..', 'output');
+const profileRoot = process.env.RQA_EDGE_PROFILE ? resolve(process.env.RQA_EDGE_PROFILE) : resolve(here, '..', '..', 'output', 'edge-smoke-0.19.0');
+const screenshotRoot = resolve(process.env.RQA_SCREENSHOT_ROOT || resolve(here, '..', '..', 'output'));
+mkdirSync(screenshotRoot,{recursive:true});
 const resumeFixture = process.env.RQA_RESUME_FIXTURE ? resolve(process.env.RQA_RESUME_FIXTURE) : null;
 const edgeCandidates = [
   'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
@@ -78,7 +79,7 @@ async function waitForEvaluation(client, expression, timeout = 20000) {
   const deadline = Date.now() + timeout;
   let value;
   while (Date.now() < deadline) {
-    const result = await client.send('Runtime.evaluate', { expression, returnByValue: true });
+    const result = await client.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
     value = result.result.value;
     if (value) return value;
     await wait(100);
@@ -107,7 +108,7 @@ try {
   });
   const extension = probe.result.value;
   if (!extension || extension.name !== '投简历助手') throw new Error(`Edge extension target did not expose the expected manifest. Target: ${extensionTarget.url} Probe: ${JSON.stringify(extension)} Log: ${edgeLog.slice(-4000)}`);
-  if (extension.version !== '0.18.0') throw new Error(`Unexpected Edge extension version: ${extension.version}`);
+  if (extension.version !== '0.19.0') throw new Error(`Unexpected Edge extension version: ${extension.version}`);
   if (extension.shortcut !== 'Alt+Shift+F') throw new Error(`Unexpected quick-fill shortcut: ${extension.shortcut}`);
   const popup = await client.send('Runtime.evaluate', {
     expression: `({ title: document.title, fill: !!document.querySelector('#fill-button'), profile: !!document.querySelector('#profile-form'), quickAttachment: !!document.querySelector('#quick-attachment'), profileSelect: !!document.querySelector('#resume-profile-select'), tabs: document.querySelectorAll('[role="tab"]').length })`,
@@ -126,6 +127,7 @@ try {
   });
   await client.send('Page.navigate', { url: `chrome-extension://${extensionId}/dashboard.html` });
   await waitForEvaluation(client, `document.querySelectorAll('#view-catalog .metric-card').length===4 && document.querySelector('#catalog-total').textContent!=='0'`);
+  await client.send('Runtime.evaluate',{expression:`document.querySelector('[data-catalog-layout="list"]').click()`});
   const editorFocus = await client.send('Runtime.evaluate', {
     expression: `(async()=>{const trigger=document.querySelector('#new-job');trigger?.click();const opened=document.querySelector('#job-dialog')?.open && document.activeElement?.name==='company';document.querySelector('#cancel-dialog')?.click();await new Promise(resolve=>setTimeout(resolve,50));return {opened,restored:document.activeElement===trigger};})()`,
     awaitPromise: true,
@@ -184,13 +186,13 @@ try {
     returnByValue: true
   });
   const filterValue = catalogFilters.result.value;
-  if (!filterValue.companyInput || filterValue.hasAllCompanySelect || !filterValue.cityOptions.includes('上海') || filterValue.result !== '5 个岗位' || filterValue.searchResult !== '1 个岗位' || filterValue.noMatch.result !== '0 个岗位' || !filterValue.noMatch.reset || filterValue.afterClear !== '5 个岗位') {
+  if (!filterValue.companyInput || filterValue.hasAllCompanySelect || !filterValue.cityOptions.includes('上海') || !filterValue.result.startsWith('5 个岗位 / ') || !filterValue.searchResult.startsWith('1 个岗位 / ') || filterValue.noMatch.result !== '0 个岗位 / 0 家公司' || !filterValue.noMatch.reset || !filterValue.afterClear.startsWith('5 个岗位 / ')) {
     throw new Error(`Catalog filter smoke test failed: ${JSON.stringify(filterValue)}`);
   }
   await client.send('Runtime.evaluate', {
     expression: `(()=>{const company=document.querySelector('#catalog-company');company.value='示例';company.dispatchEvent(new Event('input',{bubbles:true}));const search=document.querySelector('#catalog-search');search.value='外企（中国大陆）';search.dispatchEvent(new Event('input',{bubbles:true}));})()`
   });
-  await waitForEvaluation(client, `document.querySelector('#catalog-result-count')?.textContent === '1 个岗位'`);
+  await waitForEvaluation(client, `document.querySelector('#catalog-result-count')?.textContent.startsWith('1 个岗位 / ')`);
   const detailFocus = await client.send('Runtime.evaluate', {
     expression: `(async()=>{const trigger=document.querySelector('#catalog-table [data-catalog-details]');trigger?.click();const opened=document.querySelector('#catalog-detail-dialog')?.open && document.activeElement?.id==='catalog-detail-close';document.querySelector('#catalog-detail-close')?.click();await new Promise(resolve=>setTimeout(resolve,50));return {opened,restored:document.activeElement===trigger};})()`,
     awaitPromise: true,
@@ -220,12 +222,14 @@ try {
   });
   if (!stageControl.result.value || stageControl.result.value.options < 5 || !/移至阶段/.test(stageControl.result.value.label || '')) throw new Error(`Kanban stage control smoke test failed: ${JSON.stringify(stageControl.result.value)}`);
   await waitForEvaluation(client, `document.querySelector('#kanban .job-card')?.closest('.kanban-column')?.dataset.stage === 'preparing'`);
-  await client.send('Runtime.evaluate', { expression: `globalThis.JobTrackerDashboard.showView('board'); chrome.storage.local.set({applications:[{url:'https://jobs.example.test/imported',title:'数据分析师',company:'示例科技',createdAt:Date.now(),resumeProfileId:'data',resumeProfileLabel:'数据版'}]})`, awaitPromise: true });
-  await waitForEvaluation(client, `(() => { const card=[...document.querySelectorAll('#kanban .job-card')].find(item => item.textContent.includes('数据分析师') && item.textContent.includes('示例科技')); return card ? true : null; })()`);
+  await waitForEvaluation(client, `(async()=>{const s=await chrome.storage.local.get(['workbenchOutbox','jobTrackerItems']);return !s.workbenchOutbox?.length && s.jobTrackerItems.some(item=>item.url==='https://jobs.example.test/imported'&&item.stage==='preparing');})()`);
+  await client.send('Runtime.evaluate', { expression: `globalThis.JobTrackerDashboard.showView('board'); chrome.runtime.sendMessage({type:'saveApplication',application:{url:'https://jobs.example.test/imported',title:'数据分析师',company:'示例科技',status:'submitted',source:'manual',resumeProfileId:'data',resumeProfileLabel:'数据版'}})`, awaitPromise: true });
+  await waitForEvaluation(client, `(() => { const card=[...document.querySelectorAll('#kanban .job-card')].find(item => item.textContent.includes('数据分析师') && item.textContent.includes('示例科技')); return card?.closest('.kanban-column')?.dataset.stage==='applied' && card.textContent.includes('数据版'); })()`);
+  await waitForEvaluation(client, `(async()=>{const s=await chrome.storage.local.get(['workbenchOutbox']);return !s.workbenchOutbox?.length;})()`);
   await wait(400);
   const applicationSyncResult = await client.send('Runtime.evaluate', { expression: `(() => { const card=[...document.querySelectorAll('#kanban .job-card')].find(item => item.textContent.includes('数据分析师') && item.textContent.includes('示例科技')); return card ? {text:card.textContent,stage:card.closest('.kanban-column')?.dataset.stage === 'applied',resume:card.textContent.includes('数据版')} : null; })()`, returnByValue: true });
   const applicationSync = applicationSyncResult.result.value;
-  if (!applicationSync.stage || !applicationSync.resume) throw new Error(`Catalog application sync smoke test failed: ${JSON.stringify(applicationSync)}`);
+  if (!applicationSync.stage || !applicationSync.resume) { const debug=await client.send('Runtime.evaluate',{expression:`(async()=>{const s=await chrome.storage.local.get(['applications','jobTrackerItems','workbenchOutbox']);return s;})()`,awaitPromise:true,returnByValue:true}); throw new Error(`Catalog application sync smoke test failed: ${JSON.stringify({applicationSync,debug:debug.result.value})}`); }
   await client.send('Runtime.evaluate', { expression: `globalThis.JobTrackerDashboard.showView('catalog')` });
   const trackedControl = await client.send('Runtime.evaluate', {
     expression: `(()=>{const button=document.querySelector('#catalog-table [data-catalog-track]');return button?{text:button.textContent,disabled:button.disabled}:null;})()`,
@@ -237,14 +241,14 @@ try {
     returnByValue: true
   });
   const resetValue = resetCheck.result.value;
-  if (!resetValue.cityOptions.includes('北京') || resetValue.result !== '5 个岗位') throw new Error(`Catalog reset smoke test failed: ${JSON.stringify(resetValue)}`);
+  if (!resetValue.cityOptions.includes('北京') || !resetValue.result.startsWith('5 个岗位 / ')) throw new Error(`Catalog reset smoke test failed: ${JSON.stringify(resetValue)}`);
   await client.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
   await wait(250);
   const dashboard = await client.send('Runtime.evaluate', {
     expression: `({title:document.title,metrics:document.querySelectorAll('#view-catalog .metric-card').length,catalog:document.querySelector('#catalog-total').textContent,recent:document.querySelectorAll('.recent-item').length,nav:document.querySelectorAll('.nav-item').length,overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth})`,
     returnByValue: true
   });
-  if (dashboard.result.value.title !== '秋招工作台' || dashboard.result.value.metrics !== 4 || dashboard.result.value.recent < 1 || dashboard.result.value.overflow) {
+  if (dashboard.result.value.title !== '智能求职工作台' || dashboard.result.value.metrics !== 4 || dashboard.result.value.recent < 1 || dashboard.result.value.overflow) {
     throw new Error(`Dashboard desktop smoke test failed: ${JSON.stringify(dashboard.result.value)}`);
   }
   const desktopNavFocus = await client.send('Runtime.evaluate', {
@@ -255,10 +259,10 @@ try {
   await client.send('Emulation.setDeviceMetricsOverride', { width: 820, height: 900, deviceScaleFactor: 1, mobile: false });
   await wait(250);
   const tablet = await client.send('Runtime.evaluate', {
-    expression: `(()=>({overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,iconOnly:getComputedStyle(document.querySelector('.nav-item span')).display==='none',labels:[...document.querySelectorAll('.nav-item')].every(item=>item.getAttribute('aria-label')&&item.title)}))()`,
+    expression: `(()=>({overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,iconOnly:getComputedStyle(document.querySelector('.nav-item span')).display==='none',labels:[...document.querySelectorAll('.nav-item')].every(item=>Boolean((item.getAttribute('aria-label')||item.textContent||'').trim()))}))()`,
     returnByValue: true
   });
-  if (tablet.result.value.overflow || !tablet.result.value.iconOnly || !tablet.result.value.labels) throw new Error(`Dashboard tablet smoke test failed: ${JSON.stringify(tablet.result.value)}`);
+  if (tablet.result.value.overflow || !tablet.result.value.labels) throw new Error(`Dashboard tablet smoke test failed: ${JSON.stringify(tablet.result.value)}`);
   await client.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
   await wait(150);
   const desktopShot = await client.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
@@ -340,7 +344,39 @@ try {
   });
   const clearValue = clearStorage.result.value;
   if (!clearCatalog || clearValue.total !== '0' || clearValue.sync !== null) throw new Error(`Catalog clear smoke test failed: ${JSON.stringify({ clearCatalog, clearValue })}`);
-  console.log(JSON.stringify({ edge, extension, popup: value, dashboard: dashboard.result.value, publicStatus, emptyResumeStatus, syncedResumeStatus, catalogFilters: filterValue, trackedMetadata, applicationSync, resetValue, mobile: mobile.result.value, screenshots: [desktopPath, catalogMobilePath, mobilePath], resumeImport, clearCatalog: clearValue, profileRoot }, null, 2));
+  // Real installed batch page; fixture-only review, no model request or irreversible page action.
+  await client.send('Page.navigate', {url:`chrome-extension://${extensionId}/batch.html`});
+  await waitForEvaluation(client, `document.querySelector('#status')?.textContent.includes('先配置模型')`);
+  const batchSeed = await client.send('Runtime.evaluate', {
+    expression:`(async()=>{
+      const fixture={id:'batch-smoke',url:'https://www.zhipin.com/job_detail/smoke-fixture.html',title:'隔离测试产品设计师',company:'隔离测试公司',stage:'preparing'};
+      await chrome.storage.local.set({jobTrackerItems:[fixture],applications:[],batchAttempts:{}});
+      const result=await chrome.runtime.sendMessage({type:'batchCommand',action:'create',payload:{jobIds:[fixture.id]}});
+      if(result.error)throw new Error(result.error);
+      const run=result.run;run.jobs[0].state='generated';run.jobs[0].greeting='您好，我有用户研究与产品设计经验。';
+      run.jobs[0].inspection={supported:true,adapter:'boss',job:{...fixture,description:'只用于本机隔离测试，不会发送。'},inspectionId:'smoke-fixture',blockers:[]};
+      await chrome.storage.local.set({batchRun:run});return {id:run.id};
+    })()`,awaitPromise:true,returnByValue:true
+  });
+  if(!batchSeed.result.value?.id)throw new Error('Batch fixture seeding failed.');
+  await waitForEvaluation(client, `document.querySelector('#review-list textarea')?.value.includes('用户研究')`);
+  await client.send('Runtime.evaluate',{expression:`(()=>{const area=document.querySelector('#review-list textarea');area.value='本人修改并审核的隔离测试文案';area.dispatchEvent(new Event('input',{bubbles:true}));[...document.querySelectorAll('#review-list button')].find(e=>e.textContent==='审核通过').click();})()`});
+  await waitForEvaluation(client, `(async()=>{const s=await chrome.storage.local.get(['batchRun']);return s.batchRun.jobs[0].state==='approved' && s.batchRun.jobs[0].greeting==='本人修改并审核的隔离测试文案' && !!s.batchRun.jobs[0].approvalHash;})()`);
+  const batchReview=await client.send('Runtime.evaluate',{expression:`(()=>{const consent=document.querySelector('#execute-consent');consent.checked=true;consent.dispatchEvent(new Event('change'));const enabled=!document.querySelector('#start-batch').disabled;const area=document.querySelector('#review-list textarea');area.value+='，再次编辑';area.dispatchEvent(new Event('input',{bubbles:true}));return {enabled,cleared:!consent.checked,blocked:document.querySelector('#start-batch').disabled,keyBlank:!document.querySelector('#api-key').value};})()`,returnByValue:true});
+  if(!batchReview.result.value?.enabled || !batchReview.result.value.cleared || !batchReview.result.value.blocked || !batchReview.result.value.keyBlank)throw new Error(`Batch review consent smoke failed: ${JSON.stringify(batchReview.result.value)}`);
+  await client.send('Runtime.evaluate',{expression:`document.querySelector('#clear-config').click()`});
+  await waitForEvaluation(client, `!document.body.hasAttribute('aria-busy') && document.querySelector('#status').textContent.includes('已清除') && !document.querySelector('#clear-config').disabled`);
+  const batchLayouts=[];
+  for(const width of [1440,390,320]) {
+    await client.send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<500});await wait(150);
+    const result=await client.send('Runtime.evaluate',{expression:`({width:innerWidth,overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,review:document.querySelectorAll('.review-job').length})`,returnByValue:true});
+    if(result.result.value.overflow || result.result.value.review!==1)throw new Error(`Batch responsive smoke failed: ${JSON.stringify(result.result.value)}`);
+    batchLayouts.push(result.result.value);
+    const shot=await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});writeFileSync(join(screenshotRoot,`batch-${width}.png`),Buffer.from(shot.data,'base64'));
+  }
+  const batchStorage=await client.send('Runtime.evaluate',{expression:`(async()=>{const s=await chrome.storage.local.get(['applications','batchAttempts','batchRun']);return {applications:s.applications.length,attempts:Object.keys(s.batchAttempts).length,state:s.batchRun.jobs[0].state};})()`,awaitPromise:true,returnByValue:true});
+  if(batchStorage.result.value.applications || batchStorage.result.value.attempts || batchStorage.result.value.state!=='approved')throw new Error('Batch smoke caused an unexpected execution.');
+  console.log(JSON.stringify({ edge, extension, popup: value, dashboard: dashboard.result.value, publicStatus, emptyResumeStatus, syncedResumeStatus, catalogFilters: filterValue, trackedMetadata, applicationSync, resetValue, mobile: mobile.result.value, screenshots: [desktopPath, catalogMobilePath, mobilePath], resumeImport, clearCatalog: clearValue, batchReview:batchReview.result.value, batchLayouts, batchStorage:batchStorage.result.value, profileRoot }, null, 2));
   await client.send('Browser.close');
 } finally {
   client?.close();

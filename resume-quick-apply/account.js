@@ -83,6 +83,18 @@
       if (node('profile-center-name')) node('profile-center-name').textContent = login;
       if (node('profile-center-status')) node('profile-center-status').textContent = '账号资料与访客资料分别保存';
       if (node('sync-label')) node('sync-label').textContent = '账号空间';
+      const copy = {
+        'profile-intro': '管理账号基础资料、匹配偏好和申请进度；简历附件继续保留在本机。',
+        'profile-storage-title': '账号数据与本机资料',
+        'profile-storage-badge': '账号云保存',
+        'profile-storage-copy': '基础资料、手动匹配偏好和申请阶段、备注、日程使用当前账号的云保存，并保留本机副本。公开岗位库与简历附件在本机保存；访客记录仅在明确导入后进入账号。保存和读取结果见下方账号状态。',
+        'preference-storage-title': '账号匹配偏好',
+        'preference-storage-badge': '随账号云保存',
+        'account-profile-note': '保存后先写入本机副本，再保存到当前账号；请以下方账号状态为准。',
+        'sync-summary': '账号资料与插件记录分别保存'
+      };
+      for(const [id,text] of Object.entries(copy)) if(node(id)) node(id).textContent=text;
+
       if (node('connect-extension')) node('connect-extension').disabled = true;
       if (node('sync-status')) node('sync-status').textContent = '当前使用账号空间。插件记录需先退出账号，再从访客模式连接；不会自动上传插件资料。';
     }

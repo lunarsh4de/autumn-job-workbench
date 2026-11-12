@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
   "name": "投简历助手",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "description": "从简历分类多类经历，在招聘网站快速填充，并在本地智能求职工作台管理岗位进度。",
   "homepage_url": "https://github.com/lunarsh4de",
   "permissions": ["storage", "unlimitedStorage", "activeTab", "scripting", "contextMenus"],
   "host_permissions": ["https://github.com/*", "https://api.github.com/*"],
+  "optional_host_permissions": ["https://*/*"],
   "action": {
     "default_title": "投简历助手",
     "default_popup": "popup.html"

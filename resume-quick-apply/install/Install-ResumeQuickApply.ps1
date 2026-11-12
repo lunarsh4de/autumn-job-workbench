@@ -10,8 +10,8 @@ $ErrorActionPreference = 'Stop'
 
 $sourceRoot = Split-Path -Parent $PSScriptRoot
 $manifestPath = Join-Path $sourceRoot 'manifest.json'
-$runtimeFiles = @('manifest.json', 'popup.html', 'popup.css', 'design-system.css', 'popup.js', 'dashboard.html', 'dashboard.css', 'dashboard.js', 'dashboard-data.js', 'catalog.js', 'catalog-data.js', 'catalog-db.js', 'content.js', 'data.js', 'backup-sync-data.js', 'github-sync.js', 'resume-parser.js', 'service-worker.js', 'onboarding.html', 'README.md', 'DESIGN_SYSTEM.md', 'PRODUCT_REVIEW.md')
-$vendorFiles = @('pdf.min.mjs', 'pdf.worker.min.mjs', 'mammoth.browser.min.js', 'PDFJS-LICENSE', 'MAMMOTH-LICENSE')
+$runtimeFiles = @('manifest.json', 'popup.html', 'popup.css', 'design-system.css', 'popup.js', 'dashboard.html', 'dashboard.css', 'dashboard.js', 'dashboard-data.js', 'catalog.js', 'catalog-data.js', 'catalog-db.js', 'catalog-view.js', 'account-config.js', 'account-data.js', 'account.js', 'content.js', 'data.js', 'backup-sync-data.js', 'github-sync.js', 'resume-parser.js', 'service-worker.js', 'batch-worker.js', 'batch-content.js', 'batch.html', 'batch.js', 'batch.css', 'onboarding.html', 'README.md', 'DESIGN_SYSTEM.md', 'PRODUCT_REVIEW.md')
+$vendorFiles = @('pdf.min.mjs', 'pdf.worker.min.mjs', 'mammoth.browser.min.js', 'PDFJS-LICENSE', 'MAMMOTH-LICENSE', 'supabase.min.js', 'SUPABASE-LICENSE')
 $runtimeFiles += @('workbench-data.js', 'workbench-sync.js', 'workbench-bridge.js', 'SYNC_DESIGN.md')
 $edgeCandidates = @(
   "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
@@ -31,6 +31,26 @@ $vendorRoot = Join-Path $sourceRoot 'vendor'
 foreach ($file in $vendorFiles) {
   if (-not (Test-Path -LiteralPath (Join-Path $vendorRoot $file))) { throw "Required vendor file is missing: $file" }
 }
+function Test-LocalPageAssets([string]$Root) {
+  foreach ($page in @('popup.html', 'dashboard.html', 'onboarding.html', 'batch.html')) {
+    $html = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $Root $page)
+    foreach ($match in [regex]::Matches($html, '(?:src|href)=["'']([^"'']+)["'']')) {
+      $reference = $match.Groups[1].Value
+      if ($reference -match '^(?:https?:|data:|mailto:|#|//)') { continue }
+      $asset = ($reference -split '[?#]', 2)[0]
+      if ($asset -and -not (Test-Path -LiteralPath (Join-Path $Root $asset) -PathType Leaf)) {
+        throw "Missing page dependency in ${page}: $asset"
+      }
+    }
+  }
+}
+$packagePath = Join-Path $sourceRoot 'package.json'
+if (Test-Path -LiteralPath $packagePath) {
+  $package = Get-Content -Raw -Encoding UTF8 -LiteralPath $packagePath | ConvertFrom-Json
+  if ($package.version -ne $manifest.version) { throw 'Manifest and package versions differ.' }
+}
+Test-LocalPageAssets $sourceRoot
+
 $edgePath = $edgeCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
 if (-not $edgePath) { throw 'Microsoft Edge was not found on this computer.' }
 
@@ -62,6 +82,8 @@ foreach ($file in $vendorFiles) {
 
 $installed = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $targetRoot 'manifest.json') | ConvertFrom-Json
 if ($installed.version -ne $manifest.version) { throw 'Copied extension version does not match the package.' }
+
+Test-LocalPageAssets $targetRoot
 
 if ($NoLaunch) {
   Write-Output "Install copy validation passed: $targetRoot"

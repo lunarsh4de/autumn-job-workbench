@@ -1,11 +1,31 @@
-importScripts('data.js', 'dashboard-data.js', 'workbench-data.js');
+importScripts('data.js', 'dashboard-data.js', 'workbench-data.js', 'batch-worker.js');
 
 const MENU_ID = 'resume-quick-apply-fill';
 const badgeTimers = new Map();
 const applicationQueue = ResumeData.createQueue();
+const batchWorker = globalThis.BatchWorker?.create({
+  chrome,
+  recordApplication(application) {
+    return applicationQueue(async () => {
+      const saved = await chrome.storage.local.get(['applications', 'jobTrackerItems', 'workbenchDeleted']);
+      const candidate = {...application, createdAt:Date.now(), updatedAt:Date.now()};
+      const result = ResumeData.mergeApplication(saved.applications, candidate);
+      const deleted = {...(saved.workbenchDeleted || {})};
+      delete deleted[WorkbenchData.key(candidate)];
+      const tracker = TrackerData.mergeApplications(saved.jobTrackerItems, result.applications).items;
+      await chrome.storage.local.set({applications:WorkbenchData.projectApplications(result.applications,tracker),jobTrackerItems:tracker,workbenchDeleted:deleted});
+    });
+  }
+});
 
 // A single background writer prevents two tabs from overwriting each other's records.
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
+  if (message?.type === 'batchCommand') {
+    if (sender.id !== chrome.runtime.id || !sender.url?.startsWith(chrome.runtime.getURL('')) || (sender.frameId || 0) !== 0) return;
+    if (!batchWorker) { respond({error:'批量任务组件未加载。'}); return; }
+    batchWorker.handle(message.action,message.payload).then(respond).catch(error=>respond({error:error.message}));
+    return true;
+  }
   if (!['saveApplication', 'clearApplications', 'workbenchSync'].includes(message?.type)) return;
   if (sender.id !== chrome.runtime.id) return;
   const extensionPage = (sender.url || '').startsWith(chrome.runtime.getURL('')) && (sender.frameId || 0) === 0;
@@ -50,7 +70,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
 async function synchronizeWorkbench(message, internal) {
   const saved = await chrome.storage.local.get(['applications', 'jobTrackerItems', 'workbenchConnected', 'workbenchDeleted', 'workbenchSeen']);
   const connected = internal || saved.workbenchConnected === true;
-  if (message.action === 'status') return { connected, version: chrome.runtime.getManifest?.().version || '0.18.0' };
+  if (message.action === 'status') return { connected, version: chrome.runtime.getManifest?.().version || '0.19.0' };
   if (message.action === 'disconnect') {
     await chrome.storage.local.set({ workbenchConnected: false });
     return { connected: false };

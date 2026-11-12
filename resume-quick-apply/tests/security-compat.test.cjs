@@ -5,7 +5,7 @@ const { content, popup, source, until } = require('./helpers.cjs');
 
 test('recruiting sites use active-tab access; persistent bridge is scoped to the companion path', () => {
   const manifest = JSON.parse(source('manifest.json'));
-  assert.equal(manifest.version, '0.18.0');
+  assert.equal(manifest.version, '0.19.0');
   assert.equal(manifest.homepage_url, 'https://github.com/lunarsh4de');
   assert.deepEqual(manifest.permissions.sort(), ['activeTab', 'contextMenus', 'scripting', 'storage', 'unlimitedStorage'].sort());
   assert.deepEqual(manifest.host_permissions.sort(), ['https://api.github.com/*', 'https://github.com/*'].sort());
@@ -16,12 +16,32 @@ test('recruiting sites use active-tab access; persistent bridge is scoped to the
 
 test('release surfaces show the current version and author link', () => {
   const version = JSON.parse(source('manifest.json')).version;
+  assert.equal(JSON.parse(source('package.json')).version, version);
+  assert.equal(JSON.parse(source('package-lock.json')).version, version);
+  assert.equal(JSON.parse(source('package-lock.json')).packages[''].version, version);
   for (const file of ['popup.html', 'popup.js', 'onboarding.html', 'install/install-guide.html']) assert.ok(source(file).includes(version));
   for (const file of ['popup.html', 'onboarding.html', 'dashboard.html', 'install/install-guide.html']) {
     assert.match(source(file), /https:\/\/github\.com\/lunarsh4de/);
     assert.match(source(file), /target="_blank" rel="noopener noreferrer"/);
   }
   assert.doesNotMatch(source('onboarding.html'), /<script/i);
+});
+
+test('installer includes every runtime dependency referenced by the extension pages', () => {
+  const script = source('install/Install-ResumeQuickApply.ps1');
+  const copied = new Set();
+  for (const match of script.matchAll(/\$(runtimeFiles|vendorFiles)\s*(?:\+=|=)\s*@\(([^)]+)\)/g)) {
+    for (const name of match[2].matchAll(/'([^']+)'/g)) copied.add((match[1] === 'vendorFiles' ? 'vendor/' : '') + name[1]);
+  }
+  for (const page of ['popup.html', 'dashboard.html', 'onboarding.html', 'batch.html']) {
+    for (const match of source(page).matchAll(/(?:src|href)=["']([^"']+)["']/g)) {
+      const asset = match[1].split(/[?#]/)[0];
+      if (/^(?:https?:|data:|mailto:|#|\/\/)/.test(match[1]) || asset.startsWith('icons/')) continue;
+      assert.ok(copied.has(asset), `${page} references ${asset}, but the installer does not copy it`);
+    }
+  }
+  assert.ok(copied.has('vendor/SUPABASE-LICENSE'));
+  assert.match(script, /Test-LocalPageAssets \$targetRoot/);
 });
 
 test('Chinese install guide follows the three-step Edge flow without nested screenshots', () => {

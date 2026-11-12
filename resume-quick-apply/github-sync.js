@@ -268,7 +268,11 @@
   if (!extensionAvailable) {
     signIn.disabled = true;
     if (restore) restore.disabled = true;
-    setStatus('网页版仅保存在本机；GitHub 手动备份请从投简历助手工作台打开。', false, true);
+    Promise.resolve(globalThis.WorkbenchAccount?.ready).then(() => {
+      setStatus(globalThis.WorkbenchAccount?.active
+        ? '此处为插件专用的 Secret Gist 手动备份，与上方账号云保存独立；简历附件不会由账号云保存上传。'
+        : '网页版访客资料仅保存在本机；GitHub 手动备份请从投简历助手工作台打开。', false, true);
+    });
   }
   storage.get(['githubGistToken', 'githubUserLogin', 'githubGistRefreshToken', 'githubGistExpiresAt', 'githubGistId', 'githubBackupAt']).then(async stored => {
     if (!stored.githubGistToken) return;

@@ -1,6 +1,6 @@
 # GitHub 登录与账号云保存
 
-当前公开项目为 `bwhgrlakwifwjdddolsx`，GitHub provider、数据库结构及仓库公开配置变量已配置；真实浏览器 OAuth 和云端持久化验收进行中。数据库 schema usage、RLS 及 RPC 权限已单独审计，前端登录链路与跨设备验收的结果以本次 `output/workbench-redesign/` 报告为准。
+当前公开项目为 `bwhgrlakwifwjdddolsx`。GitHub provider、数据库结构及仓库公开配置已启用。已在真实浏览器完成 GitHub 登录、基础资料与模拟岗位保存、刷新恢复、退出回到访客、重新登录恢复账号记录；验收模拟资料已清理。数据库 schema usage、RLS、匿名拒绝、跨用户权限及 CAS 冲突已单独验证（事务中的模拟身份验证后回滚）。尚未完成两个真实 GitHub 账号或两台独立设备的完整端到端验收，不能将事务模拟等同于此项。
 
 现有 GitHub Pages 地址保持不变。账号服务使用 Supabase Auth 的 GitHub OAuth、官方 SDK 的 PKCE 会话和 Postgres。无 Supabase 配置时，网站显示“尚未启用”，访客本机模式继续可用。
 

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'" />
+  <title>批量投递 · 智能求职工作台</title>
+  <link rel="stylesheet" href="design-system.css" />
+  <link rel="stylesheet" href="batch.css" />
+</head>
+<body>
+  <main>
+    <header><a href="dashboard.html">返回工作台</a><h1>批量投递</h1><p>选择岗位，审核文案，再确认本批次发送或提交。</p></header>
+    <p id="status" role="status" aria-live="polite">正在读取插件…</p>
+    <section aria-labelledby="config-title">
+      <h2 id="config-title">模型与资料</h2>
+      <p>使用支持 Chat Completions 的 HTTPS 服务。请求由插件发送；Key 仅保留在本次浏览器会话，不进入云账号、备份或招聘页面。</p>
+      <form id="api-form">
+        <label>API 地址（完整接口）<input id="endpoint" type="url" required placeholder="https://你的服务地址/v1/chat/completions" autocomplete="off" /></label>
+        <label>模型名称<input id="model" required maxlength="160" placeholder="填写服务支持的模型 ID" autocomplete="off" /></label>
+        <label>API Key<input id="api-key" type="password" required autocomplete="off" spellcheck="false" /></label>
+        <div class="actions"><button type="submit">保存本次会话配置</button><button id="clear-config" type="button" class="secondary">清除 Key</button></div>
+      </form>
+      <p id="config-status">尚未配置</p>
+      <label class="check"><input id="ai-consent" type="checkbox" />允许将本批岗位描述、当前简历摘要交给上方服务生成文案；不会发送简历附件。</label>
+    </section>
+    <section aria-labelledby="select-title">
+      <div class="section-head"><h2 id="select-title">选择岗位</h2><button type="button" id="refresh-jobs" class="secondary">刷新列表</button></div>
+      <p>先在插件工作台把岗位加入申请看板，再在这里勾选，每批最多 20 项。网站访客模式可同步到插件；云账号空间独立，请在插件另行添加要投递的岗位。BOSS 记为已沟通；Moka 官网仅在明确最终申请表支持提交，其他官网保留待人工处理。</p>
+      <label>搜索已保存岗位<input id="job-search" type="search" placeholder="公司或岗位名称" /></label>
+      <div id="job-list" class="job-list"></div>
+      <button type="button" id="create-batch">创建批次并检查页面</button>
+    </section>
+    <section aria-labelledby="review-title">
+      <div class="section-head"><h2 id="review-title">审核与执行</h2><span id="run-state"></span></div>
+      <details><summary>本批交给模型的简历摘要</summary><pre id="resume-summary">创建批次后显示。</pre></details>
+      <p>逐项检查岗位、岗位描述和文案，修改后点击“审核通过”。遇到登录、验证码、附件、必填项或复杂步骤，请在打开的岗位页完成，再重新检查。BOSS 首次“立即沟通”可能发送网站默认招呼，需要本人操作；插件只发送可核对会话内的审核文本。结果不确定时先核实，避免重复投递。</p>
+      <div class="actions"><button id="inspect-all" type="button" class="secondary">重新检查待处理岗位</button><button id="generate-all" type="button" class="secondary">生成待审核文案</button></div>
+      <div id="review-list"></div>
+      <div class="execution">
+        <label class="check"><input id="execute-consent" type="checkbox" />我已逐项审核，确认向本批已审核岗位真实发送招呼或提交申请。</label>
+        <div class="actions"><button id="start-batch" type="button">确认执行已审核项</button><button id="stop-batch" class="secondary" type="button">停止后续任务</button></div>
+        <p>执行中请保持招聘页打开。停止只影响后续动作，已发送内容无法撤回。异常中断会保留结果供核查，不自动重发。</p>
+      </div>
+    </section>
+  </main>
+  <script src="batch.js"></script>
+</body>
+</html>

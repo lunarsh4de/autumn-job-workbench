@@ -9,9 +9,20 @@
   const dateTimeFormat = new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
   const weekdayFormat = new Intl.DateTimeFormat('zh-CN', { weekday: 'long' });
   let editorValues;
+  let snapshotGeneration = 0;
   const sync = globalThis.WorkbenchSync?.create({
     storage,
-    onItems(items) { state.items = items; renderAll(); },
+    onItems(items) {
+      const generation = ++snapshotGeneration;
+      state.items = items; renderAll();
+      // Plugin snapshots need the same local catalog enrichment as direct storage updates.
+      enrichCatalogMetadata(items).then(async enriched => {
+        if (!enriched.changed || generation !== snapshotGeneration || state.items !== items) return;
+        state.items = enriched.items;
+        await sync.save(enriched.items);
+        renderAll();
+      }).catch(error => flash(`补充岗位信息失败：${error.message}`, true));
+    },
     onStatus({ connected, message, pending, error }) {
       document.querySelector('#sync-status').textContent = message;
       document.querySelector('#sync-status').dataset.error = String(error && connected);
@@ -78,7 +89,7 @@
     const profileStatus = document.querySelector('#profile-resume-status');
     const profileEntryStatus = document.querySelector('#profile-entry-status');
     if (profileStatus) profileStatus.textContent = hasResumeData ? '已同步' : '未同步';
-    if (profileEntryStatus && !document.querySelector('#profile-center-name')?.textContent?.startsWith('@')) {
+    if (profileEntryStatus && !globalThis.WorkbenchAccount?.active && !document.querySelector('#profile-center-name')?.textContent?.startsWith('@')) {
       profileEntryStatus.textContent = hasResumeData ? '简历已同步' : '本地模式';
     }
     if (!node) return;
@@ -760,6 +771,14 @@
       if (!column || !event.dataTransfer) return;
       event.preventDefault();
       moveJob(event.dataTransfer.getData('text/plain'), column.dataset.stage).catch(error => flash(error.message, true));
+    });
+    document.querySelector('#open-batch')?.addEventListener('click', () => {
+      if (globalThis.chrome?.runtime?.id && location.protocol === 'chrome-extension:') {
+        chrome.tabs.create({ url: chrome.runtime.getURL('batch.html') });
+      } else {
+        flash('批量投递在插件内运行。请先在访客模式同步岗位，再在插件工作台点击“批量投递”。');
+        sync?.openLocalWorkbench().catch(error => flash(error.message, true));
+      }
     });
     document.querySelector('#open-popup').addEventListener('click', () => {
       if (globalThis.chrome?.runtime?.id && globalThis.chrome?.tabs?.create) {

@@ -93,3 +93,40 @@ test('missing configuration script and missing SDK report different loading fail
     assert.equal(w.document.querySelector('#account-login').disabled,true);
   }
 });
+
+
+test('active account copy describes cloud data while keeping attachments and legacy Gist separate',async t=>{
+  const h=page(t);await h.account.ready;
+  const d=h.w.document;
+  assert.match(d.querySelector('#profile-intro').textContent,/账号基础资料/);
+  assert.equal(d.querySelector('#profile-storage-badge').textContent,'账号云保存');
+  assert.match(d.querySelector('#profile-storage-copy').textContent,/简历附件在本机保存/);
+  assert.equal(d.querySelector('#preference-storage-badge').textContent,'随账号云保存');
+  assert.match(d.querySelector('#account-profile-note').textContent,/保存到当前账号/);
+  h.w.JobTrackerDashboard={storage:h.account.storage};h.w.eval(source('github-sync.js'));
+  await until(()=>d.querySelector('#github-backup-status').textContent.includes('与上方账号云保存独立'));
+  assert.doesNotMatch(d.querySelector('#github-backup-status').textContent,/网页版仅保存在本机/);
+  assert.equal(d.querySelector('#profile-entry-status').textContent,'账号空间');
+});
+
+test('cloud account dashboard edits and preferences stay in the account namespace without starting plugin sync',async t=>{
+  const h=page(t,{initial:{jobTrackerItems:[{title:'Guest job',company:'Guest company'}]}});await h.account.ready;
+  const w=h.w,d=w.document;const bridgeCalls=[];
+  w.WorkbenchSync={create(){return Object.fromEntries(['start','save','connect'].map(name=>[name,async()=>{bridgeCalls.push(name);}]))}};
+  w.setInterval=()=>0;w.scrollTo=()=>{};
+  w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};
+  w.eval(source('dashboard.js'));
+  await until(()=>d.querySelector('#profile-job-count').textContent==='0');
+  assert.equal(d.querySelector('#profile-entry-status').textContent,'账号空间');
+  d.querySelector('#connect-extension').click();
+  d.querySelector('#new-job').click();
+  d.querySelector('#job-form [name="company"]').value='Account company';d.querySelector('#job-form [name="title"]').value='Account role';
+  d.querySelector('#job-form').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
+  await until(()=>JSON.parse(w.localStorage.getItem(AD.namespace(uidA,'jobTrackerItems')))?.length===1);
+  await h.account.storage.set({jobSearchPreferences:{roles:'设计师',skills:'Figma',cities:'上海'}});
+  assert.equal(JSON.parse(w.localStorage.getItem(AD.namespace(uidA,'jobSearchPreferences'))).roles,'设计师');
+  assert.equal(JSON.parse(w.localStorage.getItem('jobTrackerItems'))[0].title,'Guest job');
+  assert.equal(w.localStorage.getItem('jobSearchPreferences'),null);
+  assert.equal(w.localStorage.getItem('workbenchOutbox'),null);
+  assert.deepEqual(bridgeCalls,[]);
+});
