@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "test": "node --test tests/*.test.cjs",
-    "build:auth": "esbuild node_modules/@supabase/supabase-js/dist/index.mjs --bundle --format=iife --global-name=WorkbenchSupabase --platform=browser --target=es2022 --minify --outfile=vendor/supabase.min.js"
+    "build:auth": "esbuild node_modules/@supabase/supabase-js/dist/index.mjs --bundle --format=iife --global-name=WorkbenchSupabase --platform=browser --target=es2022 --minify --supported:template-literal=false --outfile=vendor/supabase.min.js"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",
