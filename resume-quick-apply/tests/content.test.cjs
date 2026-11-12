@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { content, pdf, setup, source } = require('./helpers.cjs');
+const { content, pdf, setup, source, until } = require('./helpers.cjs');
 
 test('own details fill while username, emergency contact and password remain untouched', async t => {
   const h = content(t, `<input id="own" autocomplete="section-applicant name">
@@ -197,7 +197,7 @@ test('submission is recorded only after a visible success result appears', async
   alert.setAttribute('role', 'alert');
   alert.textContent = '申请成功，感谢您的投递';
   h.document.querySelector('main').append(alert);
-  await new Promise(resolve => setTimeout(resolve, 20));
+  await until(() => h.data.applications?.[0]?.status === 'submitted');
   assert.equal(h.data.applications.length, 1);
   assert.equal(h.data.applications[0].title, '测试产品经理');
   assert.equal(h.data.applications[0].company, 'jobs.example.test');
@@ -209,12 +209,17 @@ test('submission is recorded only after a visible success result appears', async
 
 test('common foreign ATS confirmation text is recorded automatically', async t => {
   const h = content(t, '<main><h1>Data Analyst</h1><form><button type="submit">Submit application</button></form></main>', {}, 'https://jobs.example.test/apply');
+  const persist = h.w.chrome.storage.local.set;
+  h.w.chrome.storage.local.set = async patch => {
+    await new Promise(resolve => setTimeout(resolve, 60));
+    return persist(patch);
+  };
   h.document.querySelector('form').dispatchEvent(new h.w.Event('submit', { bubbles: true, cancelable: true }));
   const status = h.document.createElement('div');
   status.setAttribute('role', 'status');
   status.textContent = 'Your application has been received. Thank you for applying.';
   h.document.querySelector('main').append(status);
-  await new Promise(resolve => setTimeout(resolve, 20));
+  await until(() => h.data.applications?.[0]?.status === 'submitted');
   assert.equal(h.data.applications.length, 1);
   assert.equal(h.data.applications[0].status, 'submitted');
   assert.equal(h.data.applications[0].source, 'auto');
@@ -224,7 +229,7 @@ test('redirected ATS confirmation resumes automatic recording from the tab marke
   const h = setup(t, '<main><h1>Data Analyst</h1><div role="status">Your application has been received.</div></main>', {}, 'https://jobs.example.test/confirmation');
   h.w.sessionStorage.setItem('rqa-pending-submission', JSON.stringify({ startedAt: Date.now() - 1000, url: 'https://jobs.example.test/apply' }));
   h.w.eval(source('content.js'));
-  await new Promise(resolve => setTimeout(resolve, 25));
+  await until(() => h.data.applications?.[0]?.status === 'submitted');
   assert.equal(h.data.applications.length, 1);
   assert.equal(h.data.applications[0].status, 'submitted');
   assert.equal(h.data.applications[0].source, 'auto');
@@ -238,7 +243,7 @@ test('company identity ignores generic Moka metadata and normalizes DJI career h
   alert.setAttribute('role', 'alert');
   alert.textContent = '投递成功';
   h.document.querySelector('main').append(alert);
-  await new Promise(resolve => setTimeout(resolve, 20));
+  await until(() => h.data.applications?.[0]?.status === 'submitted');
   assert.equal(h.data.applications[0].company, 'DJI');
   assert.equal(h.data.applications[0].title, '产品设计师');
 });
@@ -250,7 +255,7 @@ test('company identity trims a real site name before storing', async t => {
   alert.setAttribute('role', 'alert');
   alert.textContent = '申请成功';
   h.document.querySelector('main').append(alert);
-  await new Promise(resolve => setTimeout(resolve, 20));
+  await until(() => h.data.applications?.[0]?.status === 'submitted');
   assert.equal(h.data.applications[0].company, '示例科技');
 });
 
@@ -268,7 +273,7 @@ test('random company hosts are recorded with a non-empty company identity', asyn
     alert.setAttribute('role', 'alert');
     alert.textContent = '提交成功';
     h.document.querySelector('main').append(alert);
-    await new Promise(resolve => setTimeout(resolve, 15));
+    await until(() => h.data.applications?.[0]?.status === 'submitted');
     assert.equal(h.data.applications.length, 1, url);
     assert.ok(h.data.applications[0].company, url);
   }
@@ -282,7 +287,7 @@ test('automatic record failure tells the user to use manual marking', async t =>
   alert.setAttribute('role', 'alert');
   alert.textContent = '投递成功';
   h.document.querySelector('main').append(alert);
-  await new Promise(resolve => setTimeout(resolve, 25));
+  await until(() => h.document.getElementById('resume-quick-apply-root')?.shadowRoot.querySelector('.rqa-status')?.textContent.includes('自动记录失败'));
   const status = h.document.getElementById('resume-quick-apply-root').shadowRoot.querySelector('.rqa-status');
   assert.match(status.textContent, /自动记录失败/);
   assert.match(status.textContent, /记录当前岗位/);
@@ -296,7 +301,7 @@ test('validation errors and repeated success mutations do not create false or du
   await new Promise(resolve => setTimeout(resolve, 20));
   assert.equal(h.data.applications, undefined);
   h.document.querySelector('[role=alert]').textContent = '提交成功';
-  await new Promise(resolve => setTimeout(resolve, 20));
+  await until(() => h.data.applications?.[0]?.status === 'submitted');
   assert.equal(h.data.applications.length, 1);
   h.document.querySelector('[role=alert]').textContent = '申请成功';
   await new Promise(resolve => setTimeout(resolve, 20));
@@ -309,7 +314,7 @@ test('pre-existing success text is not treated as a new submission result', asyn
   await new Promise(resolve => setTimeout(resolve, 20));
   assert.equal(h.data.applications, undefined);
   h.document.querySelector('[role=status]').textContent = '本次提交成功';
-  await new Promise(resolve => setTimeout(resolve, 20));
+  await until(() => h.data.applications?.[0]?.status === 'submitted');
   assert.equal(h.data.applications.length, 1);
 });
 
@@ -323,7 +328,7 @@ test('application history retains up to 500 records for export', async t => {
   alert.setAttribute('role', 'alert');
   alert.textContent = '投递成功';
   h.document.querySelector('main').append(alert);
-  await new Promise(resolve => setTimeout(resolve, 25));
+  await until(() => h.data.applications?.[0]?.status === 'submitted');
   assert.equal(h.data.applications.length, 500);
   assert.equal(h.data.applications[0].status, 'submitted');
 });
