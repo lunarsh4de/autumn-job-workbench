@@ -5,7 +5,7 @@
   window.addEventListener('message', async event => {
     const request = event.data;
     if (event.source !== window || event.origin !== location.origin || request?.channel !== channel || request.direction !== 'request') return;
-    if (typeof request.id !== 'string' || request.id.length > 120 || !['status', 'connect', 'pull', 'commit', 'disconnect', 'openProfile', 'openLocalWorkbench'].includes(request.action)) return;
+    if (typeof request.id !== 'string' || request.id.length > 120 || !['status', 'connect', 'pull', 'commit', 'disconnect', 'openProfile', 'openLocalWorkbench', 'openBatch'].includes(request.action)) return;
     let result;
     try {
       if (JSON.stringify(request).length > 20000000) throw new Error('同步数据过大，请分批整理。');

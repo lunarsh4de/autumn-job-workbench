@@ -4,7 +4,7 @@
 
 ## 安装与升级
 
-下载最新 Release 的 ZIP，解压全部内容，运行 `安装插件.cmd`。默认安装目录为 `%LOCALAPPDATA%\ResumeQuickApply\Extension`，安装向导会显示实际路径。进入 `edge://extensions/` 或 `chrome://extensions/`，开启开发者模式，加载该目录。也可直接加载解压后含 `manifest.json` 的 `ResumeQuickApply-0.19.0` 顶层目录。
+下载最新 Release 的 ZIP，解压全部内容，运行 `安装插件.cmd`。默认安装目录为 `%LOCALAPPDATA%\ResumeQuickApply\Extension`，安装向导会显示实际路径。进入 `edge://extensions/` 或 `chrome://extensions/`，开启开发者模式，加载该目录。也可直接加载解压后含 `manifest.json` 的 `ResumeQuickApply-0.19.1` 顶层目录。
 
 已经安装的用户先导出 JSON 备份，使用同一安装目录覆盖文件，再点“重新加载”，刷新招聘页与工作台。不要卸载后重装，不要加载 ZIP 文件或源码仓库根目录。
 
@@ -30,7 +30,7 @@
 
 ## 批量任务
 
-在插件本机工作台右上角进入“批量投递”。先将目标岗位保存进插件申请看板，每批最多 20 个带 HTTPS 链接的岗位。网站访客岗位可连接同步；云账号空间独立，需要在插件另行添加目标岗位。
+在工作台左侧导航进入“批量投递”。先将目标岗位保存进插件申请看板，每批最多 20 个带 HTTPS 链接的岗位。网站访客岗位可连接同步；云账号空间独立，需要在插件另行添加目标岗位。
 
 填写完整 Chat Completions API 地址（含接口路径）、模型 ID 和自己的 Key，按浏览器提示授权 API 域名。模型 ID 由你的服务商提供，当前不自动拉取模型列表。Key 本次会话保存，浏览器关闭后重新填写；“清除 Key”移除会话配置。
 

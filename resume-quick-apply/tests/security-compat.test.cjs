@@ -5,7 +5,7 @@ const { content, popup, source, until } = require('./helpers.cjs');
 
 test('recruiting sites use active-tab access; persistent bridge is scoped to the companion path', () => {
   const manifest = JSON.parse(source('manifest.json'));
-  assert.equal(manifest.version, '0.19.0');
+  assert.equal(manifest.version, '0.19.1');
   assert.equal(manifest.homepage_url, 'https://github.com/lunarsh4de');
   assert.deepEqual(manifest.permissions.sort(), ['activeTab', 'contextMenus', 'scripting', 'storage', 'unlimitedStorage'].sort());
   assert.deepEqual(manifest.host_permissions.sort(), ['https://api.github.com/*', 'https://github.com/*'].sort());

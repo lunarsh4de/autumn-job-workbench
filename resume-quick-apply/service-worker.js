@@ -70,14 +70,15 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
 async function synchronizeWorkbench(message, internal) {
   const saved = await chrome.storage.local.get(['applications', 'jobTrackerItems', 'workbenchConnected', 'workbenchDeleted', 'workbenchSeen']);
   const connected = internal || saved.workbenchConnected === true;
-  if (message.action === 'status') return { connected, version: chrome.runtime.getManifest?.().version || '0.19.0' };
+  if (message.action === 'status') return { connected, version: chrome.runtime.getManifest?.().version || '0.19.1' };
   if (message.action === 'disconnect') {
     await chrome.storage.local.set({ workbenchConnected: false });
     return { connected: false };
   }
-  if (['openProfile', 'openLocalWorkbench'].includes(message.action)) {
-    await chrome.tabs.create({ url: chrome.runtime.getURL(message.action === 'openProfile' ? 'popup.html' : 'dashboard.html') });
-    return { connected };
+  if (['openProfile', 'openLocalWorkbench', 'openBatch'].includes(message.action)) {
+    const page = { openProfile: 'popup.html', openLocalWorkbench: 'dashboard.html', openBatch: 'batch.html' }[message.action];
+    await chrome.tabs.create({ url: chrome.runtime.getURL(page) });
+    return { connected, opened: page };
   }
   if (!connected && message.action !== 'connect') throw new Error('请先点击“连接插件”，在当前浏览器启用同步。');
   if (!['connect', 'pull', 'commit'].includes(message.action)) throw new Error('未知同步操作。');

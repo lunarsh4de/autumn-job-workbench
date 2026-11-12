@@ -19,13 +19,19 @@ let historyVisible = 30;
 let currentJobUrl = '';
 let pageSupported = true;
 
-const manifestVersion = globalThis.chrome?.runtime?.getManifest?.().version || '0.19.0';
+const manifestVersion = globalThis.chrome?.runtime?.getManifest?.().version || '0.19.1';
 const versionBadge = document.querySelector('#version-badge');
 if (versionBadge) versionBadge.textContent = `v${manifestVersion}`;
 
 document.querySelector('#open-dashboard').addEventListener('click', () => {
   chrome.tabs.create({ url: 'https://lunarsh4de.github.io/autumn-job-workbench/' });
   window.close();
+});
+document.querySelector('#open-batch').addEventListener('click', async () => {
+  try {
+    await chrome.tabs.create({ url: chrome.runtime.getURL('batch.html') });
+    window.close();
+  } catch { message.textContent = '无法打开批量页，请在扩展管理页重新加载插件后重试。'; }
 });
 
 const experienceMeta = {

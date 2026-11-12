@@ -1,4 +1,4 @@
-@import url('design-system.css?v=0.19.0');
+@import url('design-system.css?v=0.19.1');
 :root { --line-strong: #bbcbd3; --orange: #94500a; --green: #116b50; --violet: #6549a0; --shadow: var(--qa-shadow); }
 
 * { box-sizing: border-box; }

@@ -22,7 +22,9 @@
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         pendingRequests.delete(id);
-        reject(new Error('未连接到新版插件。请在同一浏览器启用 v0.18.0 以上版本，然后刷新网站。'));
+        reject(new Error(action === 'openBatch'
+          ? '无法打开批量投递。请安装或更新投简历助手至 v0.19.1，在扩展管理页点击“重新加载”，再刷新网站。也可从插件弹窗直接点击“批量投递”。'
+          : '未连接到新版插件。请在同一浏览器启用 v0.18.0 以上版本，然后刷新网站。'));
       }, 4000);
       pendingRequests.set(id, result => {
         clearTimeout(timer);
@@ -132,6 +134,7 @@
         status('已断开。现有记录仍保存在本机，重新连接后可继续同步。');
       },
       async openProfile() { return request('openProfile'); },
+      async openBatch() { return request('openBatch'); },
       async openLocalWorkbench() { return request('openLocalWorkbench'); }
     };
   }

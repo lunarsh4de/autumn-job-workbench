@@ -1,6 +1,6 @@
 {
   "name": "resume-quick-apply",
-  "version": "0.19.0",
+  "version": "0.19.1",
   "private": true,
   "scripts": {
     "test": "node --test tests/*.test.cjs",

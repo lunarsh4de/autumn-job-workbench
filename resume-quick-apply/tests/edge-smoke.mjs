@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const extensionRoot = resolve(process.env.RQA_EXTENSION_ROOT || resolve(here, '..'));
-const profileRoot = process.env.RQA_EDGE_PROFILE ? resolve(process.env.RQA_EDGE_PROFILE) : resolve(here, '..', '..', 'output', 'edge-smoke-0.19.0');
+const profileRoot = process.env.RQA_EDGE_PROFILE ? resolve(process.env.RQA_EDGE_PROFILE) : resolve(here, '..', '..', 'output', 'edge-smoke-0.19.1');
 const screenshotRoot = resolve(process.env.RQA_SCREENSHOT_ROOT || resolve(here, '..', '..', 'output'));
 mkdirSync(screenshotRoot,{recursive:true});
 const resumeFixture = process.env.RQA_RESUME_FIXTURE ? resolve(process.env.RQA_RESUME_FIXTURE) : null;
@@ -108,7 +108,7 @@ try {
   });
   const extension = probe.result.value;
   if (!extension || extension.name !== '投简历助手') throw new Error(`Edge extension target did not expose the expected manifest. Target: ${extensionTarget.url} Probe: ${JSON.stringify(extension)} Log: ${edgeLog.slice(-4000)}`);
-  if (extension.version !== '0.19.0') throw new Error(`Unexpected Edge extension version: ${extension.version}`);
+  if (extension.version !== '0.19.1') throw new Error(`Unexpected Edge extension version: ${extension.version}`);
   if (extension.shortcut !== 'Alt+Shift+F') throw new Error(`Unexpected quick-fill shortcut: ${extension.shortcut}`);
   const popup = await client.send('Runtime.evaluate', {
     expression: `({ title: document.title, fill: !!document.querySelector('#fill-button'), profile: !!document.querySelector('#profile-form'), quickAttachment: !!document.querySelector('#quick-attachment'), profileSelect: !!document.querySelector('#resume-profile-select'), tabs: document.querySelectorAll('[role="tab"]').length })`,
@@ -345,7 +345,13 @@ try {
   const clearValue = clearStorage.result.value;
   if (!clearCatalog || clearValue.total !== '0' || clearValue.sync !== null) throw new Error(`Catalog clear smoke test failed: ${JSON.stringify({ clearCatalog, clearValue })}`);
   // Real installed batch page; fixture-only review, no model request or irreversible page action.
-  await client.send('Page.navigate', {url:`chrome-extension://${extensionId}/batch.html`});
+  await client.send('Runtime.evaluate', {expression:`document.querySelector('#open-batch').click()`});
+  const launchedBatchTarget = await waitForTarget(port, item => item.type === 'page' && item.url === `chrome-extension://${extensionId}/batch.html`);
+  // The launch succeeded. Close this fixture dashboard so its sync loop cannot
+  // reinsert the earlier demo history while the batch-only fixture is seeded.
+  await client.send('Page.close');
+  client.close(); client = connect(launchedBatchTarget.webSocketDebuggerUrl); await client.ready;
+  await client.send('Runtime.enable'); await client.send('Page.enable');
   await waitForEvaluation(client, `document.querySelector('#status')?.textContent.includes('先配置模型')`);
   const batchSeed = await client.send('Runtime.evaluate', {
     expression:`(async()=>{
@@ -375,7 +381,7 @@ try {
     const shot=await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});writeFileSync(join(screenshotRoot,`batch-${width}.png`),Buffer.from(shot.data,'base64'));
   }
   const batchStorage=await client.send('Runtime.evaluate',{expression:`(async()=>{const s=await chrome.storage.local.get(['applications','batchAttempts','batchRun']);return {applications:s.applications.length,attempts:Object.keys(s.batchAttempts).length,state:s.batchRun.jobs[0].state};})()`,awaitPromise:true,returnByValue:true});
-  if(batchStorage.result.value.applications || batchStorage.result.value.attempts || batchStorage.result.value.state!=='approved')throw new Error('Batch smoke caused an unexpected execution.');
+  if(batchStorage.result.value.applications || batchStorage.result.value.attempts || batchStorage.result.value.state!=='approved')throw new Error(`Unexpected batch fixture state: ${JSON.stringify(batchStorage.result.value)}`);
   console.log(JSON.stringify({ edge, extension, popup: value, dashboard: dashboard.result.value, publicStatus, emptyResumeStatus, syncedResumeStatus, catalogFilters: filterValue, trackedMetadata, applicationSync, resetValue, mobile: mobile.result.value, screenshots: [desktopPath, catalogMobilePath, mobilePath], resumeImport, clearCatalog: clearValue, batchReview:batchReview.result.value, batchLayouts, batchStorage:batchStorage.result.value, profileRoot }, null, 2));
   await client.send('Browser.close');
 } finally {

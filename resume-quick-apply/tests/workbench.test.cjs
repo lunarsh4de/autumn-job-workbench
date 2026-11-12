@@ -16,7 +16,7 @@ function worker(initial = {}) {
   let handler;
   const event = { addListener() {} };
   const chrome = {
-    runtime: { id: 'test', getURL: path => `chrome-extension://test/${path}`, getManifest: () => ({ version: '0.19.0' }), onMessage: { addListener(fn) { handler = fn; } }, onInstalled: event, onStartup: event },
+    runtime: { id: 'test', getURL: path => `chrome-extension://test/${path}`, getManifest: () => ({ version: '0.19.1' }), onMessage: { addListener(fn) { handler = fn; } }, onInstalled: event, onStartup: event },
     storage: { onChanged: { addListener(fn) { listeners.push(fn); } }, local: {
       async get(keys) { return Object.fromEntries(keys.map(key => [key, structuredClone(state[key])])); },
       async set(patch) {
@@ -106,6 +106,20 @@ function page(t, h, initial = {}) {
   const client = w.WorkbenchSync.create({ storage, onItems(value) { items = structuredClone(value); }, onStatus(value) { status = value; } });
   return { client, local, get items() { return items; }, get status() { return status; } };
 }
+
+test('website batch launcher crosses real bridge directly to batch.html without connecting or exposing data', async t => {
+  const h = worker({ profile: { name: 'private' } });
+  const tabs = []; h.chrome.tabs.create = async options => { tabs.push(options); return { id: 9 }; };
+  const p = page(t, h);
+  const opened = await p.client.openBatch();
+  assert.equal(opened.opened, 'batch.html');
+  assert.equal(opened.connected, false);
+  assert.deepEqual(tabs, [{ url: 'chrome-extension://test/batch.html' }]);
+  assert.equal(h.state.workbenchConnected, undefined);
+  assert.equal(opened.profile, undefined);
+  assert.equal(await h.send({type:'workbenchSync',action:'openBatch'}, {...h.sender,url:'https://evil.test/'}), undefined);
+  assert.equal(tabs.length, 1);
+});
 
 test('real page client → isolated bridge → worker migrates old records and synchronizes both directions', async t => {
   const h = worker({ applications: [item({ status: 'submitted' })] });

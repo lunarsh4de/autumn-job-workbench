@@ -772,13 +772,19 @@
       event.preventDefault();
       moveJob(event.dataTransfer.getData('text/plain'), column.dataset.stage).catch(error => flash(error.message, true));
     });
-    document.querySelector('#open-batch')?.addEventListener('click', () => {
-      if (globalThis.chrome?.runtime?.id && location.protocol === 'chrome-extension:') {
-        chrome.tabs.create({ url: chrome.runtime.getURL('batch.html') });
-      } else {
-        flash('批量投递在插件内运行。请先在访客模式同步岗位，再在插件工作台点击“批量投递”。');
-        sync?.openLocalWorkbench().catch(error => flash(error.message, true));
-      }
+    document.querySelector('#open-batch')?.addEventListener('click', async () => {
+      const button = document.querySelector('#open-batch');
+      button.disabled = true;
+      try {
+        if (globalThis.chrome?.runtime?.id && location.protocol === 'chrome-extension:') {
+          await chrome.tabs.create({ url: chrome.runtime.getURL('batch.html') });
+        } else {
+          if (!sync?.openBatch) throw new Error('批量入口未加载，请刷新网站。');
+          await sync.openBatch();
+          flash('已打开插件批量投递页。该页面使用插件本机岗位与简历，云账号资料不会自动导入。');
+        }
+      } catch (error) { flash(error.message || '无法打开批量投递，请重新加载插件后刷新网站。', true); }
+      finally { button.disabled = false; }
     });
     document.querySelector('#open-popup').addEventListener('click', () => {
       if (globalThis.chrome?.runtime?.id && globalThis.chrome?.tabs?.create) {
