@@ -10,10 +10,10 @@
 
 2026-11-12 阅读 README、组件或文档，未复制源码、样式、品牌资产。
 
-- [shadcn/ui tasks faceted filter](https://github.com/shadcn-ui/ui/blob/main/apps/v4/app/(examples)/examples/tasks/components/data-table-faceted-filter.tsx)：参考所选数量、选项勾选、整组清除；这里以原生 DOM 重写。
-- [TanStack Table faceting](https://tanstack.com/table/latest/docs/guide/column-faceting)：参考维度计数与过滤语义。
-- [TanStack getFacetedRowModel](https://github.com/TanStack/table/blob/main/packages/table-core/src/utils/getFacetedRowModel.ts)：确认排除当前维度自身的计数规则。
-- [JobSync](https://github.com/Gsync/jobsync)：参考职位、申请与下一步任务的分区，保留本项目适合中文长文本的布局。
+- [shadcn/ui tasks faceted filter](https://github.com/shadcn-ui/ui/blob/dd41d19e2f80ff6891951f7ced74c2c9a650b065/apps/v4/app/%28app%29/examples/tasks/components/data-table-faceted-filter.tsx)：参考所选数量、选项勾选、整组清除；这里以原生 DOM 重写。
+- [TanStack Table faceting](https://github.com/TanStack/table/blob/c14e0221b1e656c7bb35e7b3d4cdf188719a3599/docs/framework/react/guide/column-faceting.md)：参考维度计数与过滤语义。
+- [TanStack createFacetedRowModel](https://github.com/TanStack/table/blob/c14e0221b1e656c7bb35e7b3d4cdf188719a3599/packages/table-core/src/features/column-faceting/createFacetedRowModel.ts)：确认排除当前维度自身的计数规则。
+- [JobSync](https://github.com/Gsync/jobsync/blob/8c20325c35dbf203334a270cef5aef446f06a774/src/components/myjobs/jobs-container/JobsFilterPopover.tsx)：参考职位、申请与下一步任务的分区，保留本项目适合中文长文本的布局。
 
 ## 账号与插件
 
