@@ -1,4 +1,5 @@
 -- Run once in the Supabase SQL editor. Use a dedicated project for this app.
+grant usage on schema public to authenticated;
 create table if not exists public.workbench_accounts (
   user_id uuid primary key references auth.users(id) on delete cascade,
   payload jsonb not null default '{"schemaVersion":1,"basic":{},"preferences":{},"items":[]}',
